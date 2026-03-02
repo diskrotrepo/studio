@@ -1,0 +1,33 @@
+.env
+.DS_Store
+data/
+
+packages/studio_backend/.dart_tool/*
+packages/studio_ui/.dart_tool/*
+packages/.dart_tool/*
+.claude/settings.local.json
+.claude/skills/**/scripts/config.json
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+
+# Node
+node_modules/
+
+# IDE / editor
+.idea/
+*.swp
+*~

@@ -1,0 +1,19 @@
+{
+    "_description": "Apple M4 Max with 128GB unified memory - MPS device, no torch.compile",
+    "d_model": 512,
+    "n_heads": 8,
+    "n_layers": 12,
+    "seq_length": 2048,
+    "batch_size_per_gpu": 16,
+    "gradient_accumulation": 8,
+    "learning_rate": 3e-4,
+    "learning_rate_finetune": 3e-5,
+    "learning_rate_lora": 1e-4,
+    "epochs": 20,
+    "val_split": 0.1,
+    "early_stopping_patience": 5,
+    "grad_clip_norm": 1.0,
+    "use_tags": true,
+    "use_compile": false,
+    "distributed_timeout_minutes": 30
+}

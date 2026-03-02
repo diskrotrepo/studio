@@ -1,0 +1,15 @@
+# Exclude non-essential files from build context
+vendor/README.md
+vendor/LICENSE
+vendor/licenses
+vendor/.devops
+vendor/.github
+vendor/.gemini
+vendor/tests
+vendor/examples
+vendor/pocs
+vendor/convert_hf_to_gguf.py
+vendor/.clang-tidy
+vendor/.editorconfig
+vendor/.gitignore
+vendor/.gitmodules

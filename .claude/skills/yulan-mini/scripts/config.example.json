@@ -1,0 +1,14 @@
+{
+  "api_url": "http://127.0.0.1:8003",
+  "api_key": "",
+  "model": "diskrot/YuLan-Mini-diskrot",
+  "generation": {
+    "max_tokens": 600,
+    "temperature": 0.85
+  },
+  "prompts": {
+    "default": "You are YuLan-Mini, a helpful assistant created by RUC AI Box. Answer concisely and accurately.",
+    "lyrics": "You are a creative lyricist. Write only the song lyrics in response to the user description. Output the lyrics directly with no commentary, explanation, or extra formatting.",
+    "audio_style": "You are a music producer. Write a concise audio style description for the song based on the user's input. Highlight unique styles, innovative techniques, and use positive adjectives to describe the genre, mood, tempo, and key instruments. Output the description only with no additional commentary or explanation."
+  }
+}

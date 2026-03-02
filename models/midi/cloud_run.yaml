@@ -1,0 +1,55 @@
+# Example Cloud Run service definition for the MIDI model.
+# Replace all YOUR_* placeholders with your own GCP project details.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: your-midi-service
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/vpc-access-connector: projects/YOUR_PROJECT/locations/YOUR_REGION/connectors/YOUR_CONNECTOR
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+    spec:
+      serviceAccountName: YOUR_SERVICE_ACCOUNT@YOUR_PROJECT.iam.gserviceaccount.com
+      containers:
+        - image: YOUR_REGION-docker.pkg.dev/YOUR_PROJECT/YOUR_REPO/midi:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DJANGO_DEBUG
+              value: "false"
+            - name: DJANGO_ALLOWED_HOSTS
+              value: "*"
+            - name: DJANGO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: midi-django-secret-key
+                  key: latest
+            - name: REDIS_URL
+              value: redis://YOUR_REDIS_HOST:6379/1
+            - name: DISKROT_AUDIO_BUCKET
+              value: your_audio_bucket
+            - name: GCS_MIDI_PREFIX
+              value: midi
+            - name: MIDI_DEVICE
+              value: cpu
+            - name: MIDI_GENERATED_DIR
+              value: /tmp/generated
+            - name: FILE_EXPIRY_HOURS
+              value: "1"
+          resources:
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          startupProbe:
+            httpGet:
+              path: /api/health/
+              port: 8080
+            timeoutSeconds: 240
+            periodSeconds: 240
+            failureThreshold: 1
+      timeoutSeconds: 600
+  traffic:
+    - latestRevision: true
+      percent: 100

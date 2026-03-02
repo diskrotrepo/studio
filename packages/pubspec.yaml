@@ -1,0 +1,9 @@
+name: studio_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.8.1
+
+workspace:
+  - studio_backend
+  - studio_ui

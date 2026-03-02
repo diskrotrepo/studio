@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (analyze & test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      # Remove studio_ui from workspace so dart pub get doesn't need Flutter SDK
+      - name: Prepare workspace
+        run: sed -i 's/- studio_ui//' pubspec.yaml
+
+      - name: Install dependencies
+        run: cd studio_backend && dart pub get
+
+      - name: Analyze
+        run: cd studio_backend && dart analyze --fatal-infos
+
+      - name: Run tests
+        run: cd studio_backend && dart test test/
+
+  ui:
+    name: UI (analyze & test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/studio_ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+        working-directory: packages
+
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      - name: Run tests with coverage
+        run: flutter test --coverage
+
+      - name: Check coverage threshold
+        run: |
+          TOTAL=$(grep -c "^DA:" coverage/lcov.info || echo 0)
+          HIT=$(grep "^DA:" coverage/lcov.info | grep -cv ",0$" || echo 0)
+          [ "$TOTAL" -eq 0 ] && exit 0
+          PCT=$((HIT * 100 / TOTAL))
+          echo "Coverage: $PCT% ($HIT/$TOTAL lines)"
+          [ "$PCT" -lt 15 ] && echo "Below 15% threshold" && exit 1 || true

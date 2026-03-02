@@ -1,0 +1,26 @@
+# Nightly override — pulls dev-channel images built from the main branch.
+#
+# Usage (explicit):
+#   docker compose -f docker-compose.yml -f docker-compose.nightly.yml up -d
+#
+# Usage (scripts):
+#   ./start-nightly.sh   or   start-nightly.bat
+
+services:
+  studio-backend:
+    image: diskrot/diskrot-studio:backend-dev
+
+  studio-ui:
+    image: diskrot/diskrot-studio:ui-dev
+
+  acestep:
+    image: diskrot/diskrot-studio:acestep-${ACESTEP_VARIANT:-cpu}-dev
+
+  yulan:
+    image: diskrot/diskrot-studio:yulan-${YULAN_VARIANT:-cpu}-dev
+
+  bark:
+    image: diskrot/diskrot-studio:bark-${BARK_VARIANT:-cpu}-dev
+
+  midi:
+    image: diskrot/diskrot-studio:midi-dev

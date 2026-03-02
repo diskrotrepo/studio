@@ -1,0 +1,20 @@
+torch>=2.0.0
+miditok>=3.0.0
+tqdm>=4.65.0
+midi2audio>=0.1.1
+pydub>=0.25.1
+coremltools>=8.0
+scikit-learn>=1.0
+
+# Django API
+django>=4.2
+djangorestframework>=3.14
+celery>=5.3
+redis>=5.0
+gunicorn>=21.2
+daphne>=4.0
+channels>=4.0
+channels-redis>=4.1
+
+# GCP
+google-cloud-storage>=2.14

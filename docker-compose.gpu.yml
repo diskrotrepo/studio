@@ -1,0 +1,48 @@
+# GPU override — adds NVIDIA device reservation for CUDA builds.
+#
+# Usage (explicit):
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up
+#
+# Usage (automatic via .env):
+#   Set COMPOSE_FILE=docker-compose.yml:docker-compose.gpu.yml in .env
+
+services:
+  acestep:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  yulan:
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  bark:
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # midi:
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]

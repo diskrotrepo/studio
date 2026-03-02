@@ -1,0 +1,8 @@
+{
+    "early_stopping_patience": 999,
+    "val_split": 0.0,
+    "dropout": 0.0,
+    "use_compile": true,
+    "learning_rate": 5e-5,
+    "epochs": 200
+}

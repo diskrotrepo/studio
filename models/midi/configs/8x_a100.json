@@ -1,0 +1,21 @@
+{
+    "_description": "8x NVIDIA A100 40GB distributed training - torchrun with NCCL",
+    "d_model": 512,
+    "n_heads": 8,
+    "n_layers": 12,
+    "seq_length": 8192,
+    "batch_size_per_gpu": 6,
+    "gradient_accumulation": 2,
+    "learning_rate": 5e-5,
+    "learning_rate_finetune": 1e-5,
+    "learning_rate_lora": 5e-5,
+    "dropout": 0.2,
+    "warmup_pct": 0.15,
+    "epochs": 8,
+    "val_split": 0.1,
+    "early_stopping_patience": 3,
+    "grad_clip_norm": 1.0,
+    "use_tags": true,
+    "use_compile": true,
+    "distributed_timeout_minutes": 60
+}

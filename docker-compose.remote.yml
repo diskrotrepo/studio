@@ -1,0 +1,101 @@
+# studio///diskrot — Remote mode
+#
+# Minimal stack for connecting to a remote studio///diskrot instance.
+# Only includes postgres, redis, studio-backend, and studio-ui.
+# AI model services (acestep, yulan, bark, midi) are NOT started —
+# inference requests are forwarded to the remote peer.
+
+name: diskrot-studio
+
+services:
+  postgres:
+    container_name: diskrot-postgres
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-studio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studio}
+      POSTGRES_DB: ${POSTGRES_DB:-studio}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - studio-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-studio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    container_name: diskrot-redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - studio-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  studio-backend:
+    container_name: diskrot-backend
+    image: diskrot/diskrot-studio:backend-latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8080}:80"
+    environment:
+      PORT: "80"
+      POSTGRES_HOST: postgres
+      POSTGRES_DATABASE: ${POSTGRES_DB:-studio}
+      POSTGRES_USER: ${POSTGRES_USER:-studio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studio}
+      REDIS_HOST: redis
+      DISKROT_STORAGE_ROOT: /data/storage
+      DISKROT_STUDIO_BUCKET: studio
+      AUDIO_MODELS: '{"ace_step_15": "http://acestep:8001", "bark": "http://bark:8002", "midi": "http://midi:8004"}'
+      AUDIO_API_KEY: ${ACESTEP_API_KEY:-}
+      TEXT_MODELS: '{"yulan_mini": "http://yulan:8003"}'
+      DISABLED_MODELS: ${DISABLED_MODELS:-midi}
+    volumes:
+      - studio-storage:/data/storage
+    networks:
+      - studio-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/v1/health/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  studio-ui:
+    container_name: diskrot-ui
+    image: diskrot/diskrot-studio:ui-latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${UI_PORT:-3000}:8080"
+    networks:
+      - studio-network
+    depends_on:
+      studio-backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  studio-storage:
+
+networks:
+  studio-network:
+    driver: bridge

@@ -1,0 +1,682 @@
+name: Publish Docker Images
+
+on:
+  push:
+    branches: [stable, main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      backend:
+        description: "Rebuild Backend"
+        type: boolean
+        default: false
+      ui:
+        description: "Rebuild UI"
+        type: boolean
+        default: false
+      acestep-cpu:
+        description: "Rebuild ACE-Step (CPU / ARM)"
+        type: boolean
+        default: false
+      acestep-cuda:
+        description: "Rebuild ACE-Step (CUDA)"
+        type: boolean
+        default: false
+      yulan-cpu:
+        description: "Rebuild YuLan (CPU / ARM)"
+        type: boolean
+        default: false
+      yulan-cuda:
+        description: "Rebuild YuLan (CUDA)"
+        type: boolean
+        default: false
+      bark-cpu:
+        description: "Rebuild Bark (CPU / ARM)"
+        type: boolean
+        default: false
+      bark-cuda:
+        description: "Rebuild Bark (CUDA)"
+        type: boolean
+        default: false
+      midi:
+        description: "Rebuild MIDI"
+        type: boolean
+        default: false
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      ui: ${{ steps.filter.outputs.ui }}
+      acestep: ${{ steps.filter.outputs.acestep }}
+      yulan: ${{ steps.filter.outputs.yulan }}
+      bark: ${{ steps.filter.outputs.bark }}
+      midi: ${{ steps.filter.outputs.midi }}
+      channel: ${{ steps.channel.outputs.channel }}
+      suffix: ${{ steps.channel.outputs.suffix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'packages/studio_backend/**'
+            ui:
+              - 'packages/studio_ui/**'
+            acestep:
+              - 'models/ACE-Step-1.5/**'
+            yulan:
+              - 'models/llama.cpp/**'
+            bark:
+              - 'models/bark/**'
+            midi:
+              - 'models/midi/**'
+
+      - name: Determine release channel
+        id: channel
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "channel=dev"     >> "$GITHUB_OUTPUT"
+            echo "suffix=-dev"     >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=latest"  >> "$GITHUB_OUTPUT"
+            echo "suffix="         >> "$GITHUB_OUTPUT"
+          fi
+
+  backend-amd64:
+    name: Backend (amd64)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.backend == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set build metadata
+        id: meta
+        run: echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages
+          file: packages/studio_backend/Dockerfile
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            BUILD_DATE=${{ steps.meta.outputs.BUILD_DATE }}
+            BUILD_BRANCH=${{ github.ref_name }}
+          tags: diskrot/diskrot-studio:backend${{ needs.changes.outputs.suffix }}-amd64
+          cache-from: type=gha,scope=backend-amd64
+          cache-to: type=gha,scope=backend-amd64,mode=max
+
+  backend-arm64:
+    name: Backend (arm64)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.backend == true
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set build metadata
+        id: meta
+        run: echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages
+          file: packages/studio_backend/Dockerfile
+          push: true
+          platforms: linux/arm64
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            BUILD_DATE=${{ steps.meta.outputs.BUILD_DATE }}
+            BUILD_BRANCH=${{ github.ref_name }}
+          tags: diskrot/diskrot-studio:backend${{ needs.changes.outputs.suffix }}-arm64
+          cache-from: type=gha,scope=backend-arm64
+          cache-to: type=gha,scope=backend-arm64,mode=max
+
+  backend:
+    name: Backend (manifest)
+    needs: [changes, backend-amd64, backend-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create -t diskrot/diskrot-studio:backend-${{ needs.changes.outputs.channel }} \
+            diskrot/diskrot-studio:backend${{ needs.changes.outputs.suffix }}-amd64 \
+            diskrot/diskrot-studio:backend${{ needs.changes.outputs.suffix }}-arm64
+
+  ui-amd64:
+    name: UI (amd64)
+    needs: changes
+    if: needs.changes.outputs.ui == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.ui == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set build metadata
+        id: meta
+        run: echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages
+          file: packages/studio_ui/Dockerfile
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            BUILD_ENV=local
+            BUILD_DATE=${{ steps.meta.outputs.BUILD_DATE }}
+            BUILD_BRANCH=${{ github.ref_name }}
+          tags: diskrot/diskrot-studio:ui${{ needs.changes.outputs.suffix }}-amd64
+          cache-from: type=gha,scope=ui-amd64
+          cache-to: type=gha,scope=ui-amd64,mode=max
+
+  ui-arm64:
+    name: UI (arm64)
+    needs: changes
+    if: needs.changes.outputs.ui == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.ui == true
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set build metadata
+        id: meta
+        run: echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages
+          file: packages/studio_ui/Dockerfile
+          push: true
+          platforms: linux/arm64
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            BUILD_ENV=local
+            BUILD_DATE=${{ steps.meta.outputs.BUILD_DATE }}
+            BUILD_BRANCH=${{ github.ref_name }}
+          tags: diskrot/diskrot-studio:ui${{ needs.changes.outputs.suffix }}-arm64
+          cache-from: type=gha,scope=ui-arm64
+          cache-to: type=gha,scope=ui-arm64,mode=max
+
+  ui:
+    name: UI (manifest)
+    needs: [changes, ui-amd64, ui-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create -t diskrot/diskrot-studio:ui-${{ needs.changes.outputs.channel }} \
+            diskrot/diskrot-studio:ui${{ needs.changes.outputs.suffix }}-amd64 \
+            diskrot/diskrot-studio:ui${{ needs.changes.outputs.suffix }}-arm64
+
+  acestep-cpu-amd64:
+    name: ACE-Step CPU (amd64)
+    needs: changes
+    if: needs.changes.outputs.acestep == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['acestep-cpu'] == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/ACE-Step-1.5
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          build-args: VARIANT=cpu
+          tags: diskrot/diskrot-studio:acestep-cpu${{ needs.changes.outputs.suffix }}-amd64
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-acestep-cpu${{ needs.changes.outputs.suffix }}-amd64
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-acestep-cpu${{ needs.changes.outputs.suffix }}-amd64,mode=max
+
+  acestep-cpu-arm64:
+    name: ACE-Step CPU (arm64)
+    needs: changes
+    if: needs.changes.outputs.acestep == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['acestep-cpu'] == true
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/ACE-Step-1.5
+          push: true
+          platforms: linux/arm64
+          provenance: mode=max
+          sbom: true
+          build-args: VARIANT=cpu
+          tags: diskrot/diskrot-studio:acestep-cpu${{ needs.changes.outputs.suffix }}-arm64
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-acestep-cpu${{ needs.changes.outputs.suffix }}-arm64
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-acestep-cpu${{ needs.changes.outputs.suffix }}-arm64,mode=max
+
+  acestep-cpu:
+    name: ACE-Step CPU (manifest)
+    needs: [changes, acestep-cpu-amd64, acestep-cpu-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create -t diskrot/diskrot-studio:acestep-cpu${{ needs.changes.outputs.suffix }} \
+            diskrot/diskrot-studio:acestep-cpu${{ needs.changes.outputs.suffix }}-amd64 \
+            diskrot/diskrot-studio:acestep-cpu${{ needs.changes.outputs.suffix }}-arm64
+
+  acestep-cuda:
+    name: ACE-Step (CUDA)
+    needs: changes
+    if: needs.changes.outputs.acestep == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['acestep-cuda'] == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/ACE-Step-1.5
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          build-args: VARIANT=cuda
+          tags: diskrot/diskrot-studio:acestep-cuda${{ needs.changes.outputs.suffix }}
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-acestep-cuda${{ needs.changes.outputs.suffix }}
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-acestep-cuda${{ needs.changes.outputs.suffix }},mode=max
+
+  yulan-cpu-amd64:
+    name: YuLan CPU (amd64)
+    needs: changes
+    if: needs.changes.outputs.yulan == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['yulan-cpu'] == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/llama.cpp
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          build-args: VARIANT=cpu
+          tags: diskrot/diskrot-studio:yulan-cpu${{ needs.changes.outputs.suffix }}-amd64
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-yulan-cpu${{ needs.changes.outputs.suffix }}-amd64
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-yulan-cpu${{ needs.changes.outputs.suffix }}-amd64,mode=max
+
+  yulan-cpu-arm64:
+    name: YuLan CPU (arm64)
+    needs: changes
+    if: needs.changes.outputs.yulan == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['yulan-cpu'] == true
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/llama.cpp
+          push: true
+          platforms: linux/arm64
+          provenance: mode=max
+          sbom: true
+          build-args: VARIANT=cpu
+          tags: diskrot/diskrot-studio:yulan-cpu${{ needs.changes.outputs.suffix }}-arm64
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-yulan-cpu${{ needs.changes.outputs.suffix }}-arm64
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-yulan-cpu${{ needs.changes.outputs.suffix }}-arm64,mode=max
+
+  yulan-cpu:
+    name: YuLan CPU (manifest)
+    needs: [changes, yulan-cpu-amd64, yulan-cpu-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create -t diskrot/diskrot-studio:yulan-cpu${{ needs.changes.outputs.suffix }} \
+            diskrot/diskrot-studio:yulan-cpu${{ needs.changes.outputs.suffix }}-amd64 \
+            diskrot/diskrot-studio:yulan-cpu${{ needs.changes.outputs.suffix }}-arm64
+
+  yulan-cuda:
+    name: YuLan (CUDA)
+    needs: changes
+    if: needs.changes.outputs.yulan == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['yulan-cuda'] == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/llama.cpp
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          build-args: VARIANT=cuda
+          tags: diskrot/diskrot-studio:yulan-cuda${{ needs.changes.outputs.suffix }}
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-yulan-cuda${{ needs.changes.outputs.suffix }}
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-yulan-cuda${{ needs.changes.outputs.suffix }},mode=max
+
+  bark-cpu-amd64:
+    name: Bark CPU (amd64)
+    needs: changes
+    if: needs.changes.outputs.bark == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['bark-cpu'] == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/bark
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          build-args: VARIANT=cpu
+          tags: diskrot/diskrot-studio:bark-cpu${{ needs.changes.outputs.suffix }}-amd64
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-bark-cpu${{ needs.changes.outputs.suffix }}-amd64
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-bark-cpu${{ needs.changes.outputs.suffix }}-amd64,mode=max
+
+  bark-cpu-arm64:
+    name: Bark CPU (arm64)
+    needs: changes
+    if: needs.changes.outputs.bark == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['bark-cpu'] == true
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/bark
+          push: true
+          platforms: linux/arm64
+          provenance: mode=max
+          sbom: true
+          build-args: VARIANT=cpu
+          tags: diskrot/diskrot-studio:bark-cpu${{ needs.changes.outputs.suffix }}-arm64
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-bark-cpu${{ needs.changes.outputs.suffix }}-arm64
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-bark-cpu${{ needs.changes.outputs.suffix }}-arm64,mode=max
+
+  bark-cpu:
+    name: Bark CPU (manifest)
+    needs: [changes, bark-cpu-amd64, bark-cpu-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create -t diskrot/diskrot-studio:bark-cpu${{ needs.changes.outputs.suffix }} \
+            diskrot/diskrot-studio:bark-cpu${{ needs.changes.outputs.suffix }}-amd64 \
+            diskrot/diskrot-studio:bark-cpu${{ needs.changes.outputs.suffix }}-arm64
+
+  bark-cuda:
+    name: Bark (CUDA)
+    needs: changes
+    if: needs.changes.outputs.bark == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['bark-cuda'] == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/bark
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          build-args: VARIANT=cuda
+          tags: diskrot/diskrot-studio:bark-cuda${{ needs.changes.outputs.suffix }}
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-bark-cuda${{ needs.changes.outputs.suffix }}
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-bark-cuda${{ needs.changes.outputs.suffix }},mode=max
+
+  midi-amd64:
+    name: MIDI (amd64)
+    needs: changes
+    if: needs.changes.outputs.midi == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.midi == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/midi
+          push: true
+          platforms: linux/amd64
+          provenance: mode=max
+          sbom: true
+          tags: diskrot/diskrot-studio:midi${{ needs.changes.outputs.suffix }}-amd64
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-midi${{ needs.changes.outputs.suffix }}-amd64
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-midi${{ needs.changes.outputs.suffix }}-amd64,mode=max
+
+  midi-arm64:
+    name: MIDI (arm64)
+    needs: changes
+    if: needs.changes.outputs.midi == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.midi == true
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./models/midi
+          push: true
+          platforms: linux/arm64
+          provenance: mode=max
+          sbom: true
+          tags: diskrot/diskrot-studio:midi${{ needs.changes.outputs.suffix }}-arm64
+          cache-from: type=registry,ref=diskrot/diskrot-studio:cache-midi${{ needs.changes.outputs.suffix }}-arm64
+          cache-to: type=registry,ref=diskrot/diskrot-studio:cache-midi${{ needs.changes.outputs.suffix }}-arm64,mode=max
+
+  midi:
+    name: MIDI (manifest)
+    needs: [changes, midi-amd64, midi-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create -t diskrot/diskrot-studio:midi-${{ needs.changes.outputs.channel }} \
+            diskrot/diskrot-studio:midi${{ needs.changes.outputs.suffix }}-amd64 \
+            diskrot/diskrot-studio:midi${{ needs.changes.outputs.suffix }}-arm64

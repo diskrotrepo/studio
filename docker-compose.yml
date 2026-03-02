@@ -1,0 +1,291 @@
+name: diskrot-studio
+
+services:
+  # --- Init container: ensures bind-mount directories exist with correct
+  #     ownership BEFORE any service starts.  Runs once and exits. ---
+  init-permissions:
+    image: alpine:3.20
+    user: "0:0"
+    volumes:
+      - ./data/acestep-checkpoints:/mnt/acestep-checkpoints
+      - ./data/acestep-output:/mnt/acestep-output
+      - ./data/yulan-hf-cache:/mnt/yulan-hf-cache
+      - ./data/yulan-gguf:/mnt/yulan-gguf
+      - ./data/bark-output:/mnt/bark-output
+      - ./data/bark-cache:/mnt/bark-cache
+      - ./data/midi-output:/mnt/midi-output
+      - ./data/midi-checkpoints:/mnt/midi-checkpoints
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        chown -R 1001:0 /mnt/acestep-checkpoints /mnt/acestep-output
+        chmod -R g+w     /mnt/acestep-checkpoints /mnt/acestep-output
+        chown -R 1001:0 /mnt/yulan-hf-cache /mnt/yulan-gguf
+        chmod -R g+w    /mnt/yulan-hf-cache /mnt/yulan-gguf
+        chown -R 1001:0 /mnt/bark-output /mnt/bark-cache
+        chmod -R g+w    /mnt/bark-output /mnt/bark-cache
+        chown -R 1001:0 /mnt/midi-output /mnt/midi-checkpoints
+        chmod -R g+w    /mnt/midi-output /mnt/midi-checkpoints
+    networks:
+      - studio-network
+
+  postgres:
+    container_name: diskrot-postgres
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-studio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studio}
+      POSTGRES_DB: ${POSTGRES_DB:-studio}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - studio-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-studio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    container_name: diskrot-redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - studio-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    container_name: diskrot-pgadmin
+    image: dpage/pgadmin4
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@diskrot.studio}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - studio-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redisinsight:
+    container_name: diskrot-redisinsight
+    image: redis/redisinsight:2.68
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDISINSIGHT_PORT:-5540}:5540"
+    networks:
+      - studio-network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  dozzle:
+    container_name: diskrot-dozzle
+    image: amir20/dozzle:v8.12.13
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DOZZLE_PORT:-9999}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - studio-network
+
+  studio-backend:
+    container_name: diskrot-backend
+    image: diskrot/diskrot-studio:backend-latest
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8080}:80"
+    environment:
+      PORT: "80"
+      POSTGRES_HOST: postgres
+      POSTGRES_DATABASE: ${POSTGRES_DB:-studio}
+      POSTGRES_USER: ${POSTGRES_USER:-studio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studio}
+      REDIS_HOST: redis
+      DISKROT_STORAGE_ROOT: /data/storage
+      DISKROT_STUDIO_BUCKET: studio
+      AUDIO_MODELS: '{"ace_step_15": "http://acestep:8001", "bark": "http://bark:8002", "midi": "http://midi:8004"}'
+      AUDIO_API_KEY: ${ACESTEP_API_KEY:-}
+      TEXT_MODELS: '{"yulan_mini": "http://yulan:8003"}'
+      DISABLED_MODELS: ${DISABLED_MODELS:-midi}
+    volumes:
+      - studio-storage:/data/storage
+    networks:
+      - studio-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      acestep:
+        condition: service_healthy
+      yulan:
+        condition: service_healthy
+      bark:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/v1/health/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  studio-ui:
+    container_name: diskrot-ui
+    image: diskrot/diskrot-studio:ui-latest
+    restart: unless-stopped
+    ports:
+      - "${UI_PORT:-3000}:8080"
+    networks:
+      - studio-network
+    depends_on:
+      studio-backend:
+        condition: service_healthy
+
+  acestep:
+    container_name: diskrot-acestep
+    image: diskrot/diskrot-studio:acestep-${ACESTEP_VARIANT:-cpu}
+    restart: unless-stopped
+    ports:
+      - "${ACESTEP_PORT:-8001}:8001"
+    environment:
+      ACESTEP_CONFIG_PATH: acestep-v15-turbo
+      ACESTEP_LM_MODEL_PATH: acestep-5Hz-lm-0.6B
+      ACESTEP_LM_BACKEND: pt
+      ACESTEP_INIT_LLM: "false"
+      ACESTEP_DEVICE: ${ACESTEP_VARIANT:-cpu}
+      ACESTEP_DOWNLOAD_SOURCE: huggingface
+      ACESTEP_API_HOST: 0.0.0.0
+      ACESTEP_API_PORT: "8001"
+      ACESTEP_NO_INIT: "false"
+      ACESTEP_COMPILE_MODEL: "false"
+      ACESTEP_USE_FLASH_ATTENTION: "false"
+      ACESTEP_TMPDIR: /data/output
+      ACESTEP_API_KEY: ${ACESTEP_API_KEY:-}
+    volumes:
+      - ./data/acestep-checkpoints:/app/checkpoints
+      - ./data/acestep-output:/data/output
+      - ./models/ACE-Step-1.5/loras:/app/loras
+    networks:
+      - studio-network
+    depends_on:
+      init-permissions:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  yulan:
+    container_name: diskrot-yulan
+    image: diskrot/diskrot-studio:yulan-${YULAN_VARIANT:-cpu}
+    restart: unless-stopped
+    ports:
+      - "${YULAN_PORT:-8003}:8003"
+    environment:
+      HF_HOME: /data/hf-cache
+      HF_TOKEN: ${HF_TOKEN:-}
+      YULAN_GPU_LAYERS: ${YULAN_GPU_LAYERS:-999}
+    volumes:
+      - ./data/yulan-hf-cache:/data/hf-cache
+      - ./data/yulan-gguf:/data/gguf
+    networks:
+      - studio-network
+    depends_on:
+      init-permissions:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  bark:
+    container_name: diskrot-bark
+    image: diskrot/diskrot-studio:bark-${BARK_VARIANT:-cpu}
+    restart: unless-stopped
+    ports:
+      - "${BARK_PORT:-8002}:8002"
+    environment:
+      BARK_PORT: "8002"
+      BARK_OUTPUT_DIR: /data/output
+      BARK_HF_REPO: ${BARK_HF_REPO:-diskrot/bark-diskrot}
+      HF_TOKEN: ${HF_TOKEN:-}
+      SUNO_USE_SMALL_MODELS: ${BARK_USE_SMALL_MODELS:-False}
+      SUNO_OFFLOAD_CPU: ${BARK_OFFLOAD_CPU:-False}
+    volumes:
+      - ./data/bark-output:/data/output
+      - ./data/bark-cache:/app/.cache
+    networks:
+      - studio-network
+    depends_on:
+      init-permissions:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+  midi:
+    container_name: diskrot-midi
+    image: diskrot/diskrot-studio:midi-latest
+    restart: unless-stopped
+    profiles: ["midi"]
+    ports:
+      - "${MIDI_PORT:-8004}:8004"
+    environment:
+      PORT: "8004"
+      REDIS_URL: redis://redis:6379/1
+      MIDI_DEVICE: ${MIDI_DEVICE:-cpu}
+      MIDI_MODELS_DIR: /data/checkpoints
+      MIDI_GENERATED_DIR: /data/output
+      MIDI_SOUNDFONT: ${MIDI_SOUNDFONT:-}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-changeme}
+      DJANGO_ALLOWED_HOSTS: "*"
+    volumes:
+      - ./data/midi-output:/data/output
+      - ./data/midi-checkpoints:/data/checkpoints
+    networks:
+      - studio-network
+    depends_on:
+      init-permissions:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  pgdata:
+  redisdata:
+  studio-storage:
+
+networks:
+  studio-network:
+    driver: bridge

@@ -1,0 +1,52 @@
+# docker-compose.dev.yml — Local-build overrides for development.
+#
+# Adds `build` directives so images are built from source instead of
+# being pulled from the registry.  Merge with the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# Or use the dev.sh / dev.bat helper scripts.
+
+services:
+  studio-backend:
+    build:
+      context: ./packages
+      dockerfile: studio_backend/Dockerfile
+      args:
+        BUILD_DATE: ${BUILD_DATE:-}
+        BUILD_BRANCH: ${BUILD_BRANCH:-}
+
+  studio-ui:
+    build:
+      context: ./packages
+      dockerfile: studio_ui/Dockerfile
+      args:
+        BUILD_ENV: ${BUILD_ENV:-local}
+        BUILD_DATE: ${BUILD_DATE:-}
+        BUILD_BRANCH: ${BUILD_BRANCH:-}
+
+  acestep:
+    build:
+      context: ./models/ACE-Step-1.5
+      dockerfile: Dockerfile
+      args:
+        VARIANT: ${ACESTEP_VARIANT:-cpu}
+
+  yulan:
+    build:
+      context: ./models/llama.cpp
+      dockerfile: Dockerfile
+      args:
+        VARIANT: ${YULAN_VARIANT:-cpu}
+
+  bark:
+    build:
+      context: ./models/bark
+      dockerfile: Dockerfile
+      args:
+        VARIANT: ${BARK_VARIANT:-cpu}
+
+  midi:
+    build:
+      context: ./models/midi
+      dockerfile: Dockerfile

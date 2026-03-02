@@ -1,0 +1,41 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        
+        {
+            "name": "packages",
+            "cwd": "packages",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "studio_backend",
+            "cwd": "packages\\studio_backend",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "studio_ui",
+            "cwd": "packages\\studio_ui",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "studio_ui (profile mode)",
+            "cwd": "packages\\studio_ui",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "studio_ui (release mode)",
+            "cwd": "packages\\studio_ui",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}

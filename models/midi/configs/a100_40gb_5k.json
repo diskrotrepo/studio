@@ -1,0 +1,23 @@
+{
+    "_description": "Single A100 40GB - 5k song dataset. More epochs and patience vs base a100 config to absorb larger dataset.",
+    "d_model": 512,
+    "n_heads": 8,
+    "n_layers": 12,
+    "seq_length": 8192,
+    "batch_size_per_gpu": 12,
+    "gradient_accumulation": 5,
+    "learning_rate": 3e-5,
+    "learning_rate_finetune": 1e-5,
+    "learning_rate_lora": 1e-4,
+    "dropout": 0.1,
+    "warmup_pct": 0.10,
+    "epochs": 15,
+    "val_split": 0.1,
+    "early_stopping_patience": 7,
+    "weight_decay": 0.1,
+    "grad_clip_norm": 1.0,
+    "scheduler": "cosine",
+    "use_tags": true,
+    "use_compile": true,
+    "distributed_timeout_minutes": 30
+}

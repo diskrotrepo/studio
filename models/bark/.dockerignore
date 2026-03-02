@@ -1,0 +1,10 @@
+# Exclude non-essential files from build context
+README.md
+LICENSE
+model-card.md
+notebooks
+.git
+.gitignore
+__pycache__
+*.pyc
+*.egg-info
