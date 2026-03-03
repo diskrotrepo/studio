@@ -13,7 +13,7 @@
     Also provides update functionality via -Update flag.
 
     One-liner install (run in an elevated PowerShell):
-      irm https://raw.githubusercontent.com/diskrot/studio/stable/installer/install.ps1 -OutFile $env:TEMP\diskrot-install.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP\diskrot-install.ps1
+      irm https://raw.githubusercontent.com/diskrotrepo/studio/stable/installer/install.ps1 -OutFile $env:TEMP\diskrot-install.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP\diskrot-install.ps1
 .PARAMETER Update
     Pull latest Docker images and restart the stack.
 .PARAMETER Uninstall
@@ -43,7 +43,7 @@ $DOCKER_DESKTOP_URL  = "https://desktop.docker.com/win/main/amd64/Docker%20Deskt
 $NVIDIA_DRIVER_URL   = "https://www.nvidia.com/Download/index.aspx"
 $MIN_NVIDIA_DRIVER   = 526
 $MIN_DOCKER_VERSION  = "4.18"
-$STUDIO_REPO         = "https://github.com/diskrot/studio.git"
+$STUDIO_REPO         = "https://github.com/diskrotrepo/studio.git"
 $STUDIO_COMPOSE_FILE = if ($env:COMPOSE_FILE) { $env:COMPOSE_FILE } else { "docker-compose.yml" }
 
 # --- Helpers ------------------------------------------------------------------
