@@ -15,13 +15,13 @@
 #   ./installer/install.sh --uninstall  # stop and optionally remove data
 #
 # One-liner install (paste into Terminal):
-#   curl -fsSL https://raw.githubusercontent.com/diskrot/studio/stable/installer/install.sh -o /tmp/diskrot-install.sh && bash /tmp/diskrot-install.sh
+#   curl -fsSL https://raw.githubusercontent.com/diskrotrepo/studio/stable/installer/install.sh -o /tmp/diskrot-install.sh && bash /tmp/diskrot-install.sh
 # ==============================================================================
 
 set -euo pipefail
 
 # --- Constants ----------------------------------------------------------------
-STUDIO_REPO="https://github.com/diskrot/studio.git"
+STUDIO_REPO="https://github.com/diskrotrepo/studio.git"
 DOCKER_DMG_URL_ARM="https://desktop.docker.com/mac/main/arm64/Docker.dmg"
 DOCKER_DMG_URL_X86="https://desktop.docker.com/mac/main/amd64/Docker.dmg"
 STUDIO_COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
