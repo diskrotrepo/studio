@@ -2,6 +2,10 @@
 
 Studio by diskrot is an offline generative music creation web app. It runs entirely on your machine — no cloud accounts, no subscriptions, no data leaves your computer.
 
+## Screenshot
+
+![Studio screenshot](screenshots/studio.png)
+
 ## Features
 
 - **Text-to-music generation** — Describe a song with lyrics, genre, BPM, and key; get a full audio track back (ACE-Step 1.5)
