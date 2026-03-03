@@ -340,7 +340,7 @@ do_install() {
         # Prompt for Hugging Face token
         echo ""
         echo "  A Hugging Face token is required to download AI model weights."
-        echo -e "  Create one at: ${BC}https://huggingface.co/settings/tokens${N}"
+        echo "  Create one at: https://huggingface.co/settings/tokens"
         echo "  (select 'Read' access)"
         echo ""
         printf "  Hugging Face token (hf_...): "
