@@ -21,12 +21,12 @@ void main() {
     });
 
     test('returns normalized values for non-silent audio', () {
-      // Create bytes with varying deviation from 128
+      // Create chunks with increasing variance for std-dev normalization.
       final bytes = Uint8List.fromList([
         128, 128, 128, 128, // chunk 0: silence
-        200, 200, 200, 200, // chunk 1: loud (deviation 72)
-        148, 148, 148, 148, // chunk 2: medium (deviation 20)
-        255, 255, 255, 255, // chunk 3: loudest (deviation 127)
+        128, 255, 128, 255, // chunk 1: high variance
+        128, 148, 128, 148, // chunk 2: low variance
+        0, 255, 0, 255, // chunk 3: highest variance
       ]);
       final result = extractAmplitudes(bytes, 4);
 
