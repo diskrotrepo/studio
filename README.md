@@ -51,12 +51,12 @@ Studio by diskrot is an offline generative music creation web app. It runs entir
 
 **Windows** — open PowerShell as Administrator and paste:
 ```powershell
-irm https://raw.githubusercontent.com/diskrot/studio/main/installer/install.ps1 -OutFile $env:TEMP\diskrot-install.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP\diskrot-install.ps1
+irm https://raw.githubusercontent.com/diskrotrepo/studio/stable/installer/install.ps1 -OutFile $env:TEMP\diskrot-install.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP\diskrot-install.ps1
 ```
 
 **macOS** — open Terminal and paste:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/diskrot/studio/main/installer/install.sh -o /tmp/diskrot-install.sh && bash /tmp/diskrot-install.sh
+curl -fsSL https://raw.githubusercontent.com/diskrotrepo/studio/stable/installer/install.sh -o /tmp/diskrot-install.sh && bash /tmp/diskrot-install.sh
 ```
 
 The installer handles everything — WSL, Docker, NVIDIA drivers, GPU detection, and launching the stack. First startup downloads model weights and may take several minutes.
