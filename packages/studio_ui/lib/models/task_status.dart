@@ -1,4 +1,9 @@
 class TaskStatus {
+  static const statusProcessing = 'processing';
+  static const statusUploading = 'uploading';
+  static const statusComplete = 'complete';
+  static const statusFailed = 'failed';
+
   TaskStatus({
     required this.taskId,
     required this.status,
@@ -28,7 +33,7 @@ class TaskStatus {
 
   factory TaskStatus.fromSongJson(Map<String, dynamic> json) => TaskStatus(
     taskId: json['task_id'] as String,
-    status: json['status'] as String? ?? 'complete',
+    status: json['status'] as String? ?? statusComplete,
     taskType: json['task_type'] as String? ?? 'unknown',
     result: json['result'] as Map<String, dynamic>?,
     prompt: json['prompt'] as String?,
@@ -57,10 +62,10 @@ class TaskStatus {
   final DateTime? createdAt;
   final Map<String, dynamic>? parameters;
 
-  bool get isProcessing => status == 'processing';
-  bool get isUploading => status == 'uploading';
-  bool get isComplete => status == 'complete';
-  bool get isFailed => status == 'failed';
+  bool get isProcessing => status == statusProcessing;
+  bool get isUploading => status == statusUploading;
+  bool get isComplete => status == statusComplete;
+  bool get isFailed => status == statusFailed;
 
   /// Whether this task is still active and should be polled.
   bool get isActive => isProcessing || isUploading;

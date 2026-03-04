@@ -81,7 +81,9 @@ class ApiClient {
 
   /// Login -- standalone raw HTTP call (pre-auth, no DiskRotHttpClient needed).
   Future<LoginResponse> login(String email, String password) async {
-    final uri = config.buildUri('/v1/authentication/diskrot-login');
+    final uri = config.secure
+        ? Uri.https(config.apiHost, '/v1/authentication/diskrot-login')
+        : Uri.http(config.apiHost, '/v1/authentication/diskrot-login');
     final client = http.Client();
     try {
       final response = await client.post(
@@ -90,15 +92,7 @@ class ApiClient {
         body: jsonEncode({'email': email, 'password': password}),
       );
 
-      if (response.statusCode != 200) {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
-        throw ApiException(
-          response.statusCode,
-          body['message'] as String? ?? 'Login failed',
-        );
-      }
-
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final body = _ok(response, 'Login failed');
       return LoginResponse(
         idToken: body['idToken'] as String,
         refreshToken: body['refreshToken'] as String,
@@ -113,12 +107,7 @@ class ApiClient {
   /// Fetch the server-assigned external user ID.
   Future<String> getUserId() async {
     final response = await httpClient.get(endpoint: '/users/me');
-
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get user ID');
-    }
-
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get user ID');
     return body['user_id'] as String;
   }
 
@@ -127,16 +116,7 @@ class ApiClient {
       endpoint: '/audio/generate',
       data: taskBody,
     );
-
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Task submission failed',
-      );
-    }
-
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Task submission failed');
     return body['task_id'] as String;
   }
 
@@ -147,11 +127,7 @@ class ApiClient {
       throw ApiException(404, 'Task not found');
     }
 
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get task status');
-    }
-
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get task status');
     return TaskStatus.fromJson(body);
   }
 
@@ -176,11 +152,7 @@ class ApiClient {
       query: query,
     );
 
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get songs');
-    }
-
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get songs');
     final data = (body['data'] as List<dynamic>?) ?? [];
     final songs = data
         .map((e) => TaskStatus.fromSongJson(e as Map<String, dynamic>))
@@ -195,17 +167,15 @@ class ApiClient {
 
   Future<Map<String, dynamic>> healthCheck() async {
     final response = await httpClient.get(endpoint: '/audio/health');
-
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Health check failed');
-    }
-
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Health check failed');
   }
 
   /// Build the full URL for the server-side song download endpoint.
   String songDownloadUrl(String taskId) {
-    return config.buildUri('/v1/audio/songs/$taskId/download').toString();
+    final uri = config.secure
+        ? Uri.https(config.apiHost, '/v1/audio/songs/$taskId/download')
+        : Uri.http(config.apiHost, '/v1/audio/songs/$taskId/download');
+    return uri.toString();
   }
 
   /// Download audio bytes from an internal API URL via the authenticated client.
@@ -243,16 +213,7 @@ class ApiClient {
       endpoint: '/audio/upload',
       data: {'filename': filename, 'contentType': contentType, 'size': size},
     );
-
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to create upload',
-      );
-    }
-
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to create upload');
   }
 
   /// Finalize (or continue) a resumable upload by sending bytes through the
@@ -295,10 +256,7 @@ class ApiClient {
       endpoint: '/audio/songs/$taskId',
       data: body,
     );
-
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to update song');
-    }
+    _ok(response, 'Failed to update song');
   }
 
   Future<void> moveSong({
@@ -309,18 +267,12 @@ class ApiClient {
       endpoint: '/audio/songs/$taskId',
       data: {'workspace_id': workspaceId},
     );
-
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to move song');
-    }
+    _ok(response, 'Failed to move song');
   }
 
   Future<void> deleteSong({required String taskId}) async {
     final response = await httpClient.delete(endpoint: '/audio/songs/$taskId');
-
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to delete song');
-    }
+    _ok(response, 'Failed to delete song');
   }
 
   Future<int> batchDeleteSongs({required List<String> taskIds}) async {
@@ -328,23 +280,13 @@ class ApiClient {
       endpoint: '/audio/songs/batch-delete',
       data: {'task_ids': taskIds},
     );
-
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to batch delete songs');
-    }
-
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to batch delete songs');
     return body['deleted'] as int? ?? 0;
   }
 
   Future<TaskStatus> getSongDetails(String taskId) async {
     final response = await httpClient.get(endpoint: '/audio/songs/$taskId');
-
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get song details');
-    }
-
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get song details');
     return TaskStatus.fromSongJson(body);
   }
 
@@ -354,10 +296,7 @@ class ApiClient {
 
   Future<List<Map<String, dynamic>>> getLogs() async {
     final response = await httpClient.get(endpoint: '/logs');
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get logs');
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get logs');
     return (body['data'] as List<dynamic>).cast<Map<String, dynamic>>();
   }
 
@@ -369,10 +308,7 @@ class ApiClient {
     final response = await httpClient.get(
       endpoint: '/settings',
     );
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get settings');
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get settings');
     return body.map((k, v) => MapEntry(k, v as String));
   }
 
@@ -381,13 +317,7 @@ class ApiClient {
       endpoint: '/settings',
       data: settings,
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to update settings',
-      );
-    }
+    _ok(response, 'Failed to update settings');
   }
 
   // ---------------------------------------------------------------------------
@@ -398,10 +328,7 @@ class ApiClient {
     final response = await httpClient.get(
       endpoint: '/server-backends',
     );
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get server backends');
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get server backends');
     return (body['data'] as List<dynamic>).cast<Map<String, dynamic>>();
   }
 
@@ -414,14 +341,7 @@ class ApiClient {
       endpoint: '/server-backends',
       data: {'name': name, 'api_host': apiHost, 'secure': secure},
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to create server backend',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to create server backend');
   }
 
   Future<void> updateServerBackend({
@@ -438,26 +358,14 @@ class ApiClient {
         'secure': ?secure,
       },
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to update server backend',
-      );
-    }
+    _ok(response, 'Failed to update server backend');
   }
 
   Future<void> deleteServerBackend(String id) async {
     final response = await httpClient.delete(
       endpoint: '/server-backends/$id',
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to delete server backend',
-      );
-    }
+    _ok(response, 'Failed to delete server backend');
   }
 
   Future<void> activateServerBackend(String id) async {
@@ -465,12 +373,7 @@ class ApiClient {
       endpoint: '/server-backends/$id/activate',
       data: {},
     );
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to activate server backend',
-      );
-    }
+    _ok(response, 'Failed to activate server backend');
   }
 
   /// Test whether a remote host is healthy before adding it as a backend.
@@ -501,10 +404,7 @@ class ApiClient {
 
   Future<List<Map<String, dynamic>>> getPeers() async {
     final response = await httpClient.get(endpoint: '/peers');
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get peers');
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get peers');
     return (body['data'] as List<dynamic>).cast<Map<String, dynamic>>();
   }
 
@@ -513,9 +413,7 @@ class ApiClient {
       endpoint: '/peers/$id/block',
       data: {},
     );
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to block peer');
-    }
+    _ok(response, 'Failed to block peer');
   }
 
   Future<void> unblockPeer(String id) async {
@@ -523,9 +421,7 @@ class ApiClient {
       endpoint: '/peers/$id/unblock',
       data: {},
     );
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to unblock peer');
-    }
+    _ok(response, 'Failed to unblock peer');
   }
 
   // ---------------------------------------------------------------------------
@@ -534,10 +430,7 @@ class ApiClient {
 
   Future<List<Workspace>> getWorkspaces() async {
     final response = await httpClient.get(endpoint: '/workspaces');
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get workspaces');
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get workspaces');
     return (body['data'] as List<dynamic>)
         .map((e) => Workspace.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -548,16 +441,8 @@ class ApiClient {
       endpoint: '/workspaces',
       data: {'name': name},
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to create workspace',
-      );
-    }
-    return Workspace.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
+    final body = _ok(response, 'Failed to create workspace');
+    return Workspace.fromJson(body);
   }
 
   Future<void> renameWorkspace(String id, String name) async {
@@ -565,20 +450,12 @@ class ApiClient {
       endpoint: '/workspaces/$id',
       data: {'name': name},
     );
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to rename workspace');
-    }
+    _ok(response, 'Failed to rename workspace');
   }
 
   Future<void> deleteWorkspace(String id) async {
     final response = await httpClient.delete(endpoint: '/workspaces/$id');
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to delete workspace',
-      );
-    }
+    _ok(response, 'Failed to delete workspace');
   }
 
   /// Loads workspaces from the backend and sets the active one.
@@ -601,10 +478,7 @@ class ApiClient {
 
   Future<List<LyricSheet>> getLyricSheets() async {
     final response = await httpClient.get(endpoint: '/lyric-book');
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to load lyric sheets');
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to load lyric sheets');
     final list = body['data'] as List<dynamic>;
     return list
         .map((e) => LyricSheet.fromJson(e as Map<String, dynamic>))
@@ -619,26 +493,13 @@ class ApiClient {
       endpoint: '/lyric-book',
       data: {'title': title, 'content': content},
     );
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to create lyric sheet',
-      );
-    }
-    return LyricSheet.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
+    final body = _ok(response, 'Failed to create lyric sheet');
+    return LyricSheet.fromJson(body);
   }
 
   Future<Map<String, dynamic>> getLyricSheetDetail(String id) async {
     final response = await httpClient.get(endpoint: '/lyric-book/$id');
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to load lyric sheet',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to load lyric sheet');
   }
 
   Future<void> updateLyricSheet(
@@ -653,35 +514,19 @@ class ApiClient {
       endpoint: '/lyric-book/$id',
       data: data,
     );
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to update lyric sheet',
-      );
-    }
+    _ok(response, 'Failed to update lyric sheet');
   }
 
   Future<void> deleteLyricSheet(String id) async {
     final response = await httpClient.delete(endpoint: '/lyric-book/$id');
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to delete lyric sheet',
-      );
-    }
+    _ok(response, 'Failed to delete lyric sheet');
   }
 
   Future<List<LyricSheet>> searchLyricSheets(String query) async {
     final response = await httpClient.get(
       endpoint: '/lyric-book/search?q=${Uri.encodeQueryComponent(query)}',
     );
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to search lyric sheets',
-      );
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to search lyric sheets');
     final list = body['data'] as List<dynamic>;
     return list
         .map((e) => LyricSheet.fromJson(e as Map<String, dynamic>))
@@ -694,12 +539,7 @@ class ApiClient {
       endpoint: '/audio/songs/$taskId',
       data: data,
     );
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to link song to lyric sheet',
-      );
-    }
+    _ok(response, 'Failed to link song to lyric sheet');
   }
 
   // ---------------------------------------------------------------------------
@@ -719,14 +559,7 @@ class ApiClient {
         'audio_model': ?audioModel,
       },
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to generate lyrics',
-      );
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to generate lyrics');
     return body['lyrics'] as String;
   }
 
@@ -743,14 +576,7 @@ class ApiClient {
         'audio_model': ?audioModel,
       },
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to generate prompt',
-      );
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to generate prompt');
     return body['prompt'] as String;
   }
 
@@ -760,10 +586,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> getModelDefaults(String model) async {
     final response = await httpClient.get(endpoint: '/audio/$model/defaults');
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get model defaults');
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get model defaults');
     return (body['data'] as Map<String, dynamic>?) ?? body;
   }
 
@@ -774,11 +597,7 @@ class ApiClient {
   Future<ModelCapabilities> getModelCapabilities(String model) async {
     final response =
         await httpClient.get(endpoint: '/audio/$model/capabilities');
-    if (response.statusCode != 200) {
-      throw ApiException(
-          response.statusCode, 'Failed to get model capabilities');
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get model capabilities');
     final data = (body['data'] as Map<String, dynamic>?) ?? body;
     return ModelCapabilities.fromJson(data);
   }
@@ -789,10 +608,7 @@ class ApiClient {
 
   Future<List<Map<String, dynamic>>> getLoraList() async {
     final response = await httpClient.get(endpoint: '/audio/lora/list');
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to list LoRAs');
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to list LoRAs');
     // The endpoint wraps the payload in a `data` key – unwrap it.
     final data = (body['data'] as Map<String, dynamic>?) ?? body;
     return (data['loras'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ??
@@ -801,10 +617,7 @@ class ApiClient {
 
   Future<Map<String, dynamic>> getLoraStatus() async {
     final response = await httpClient.get(endpoint: '/audio/lora/status');
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to get LoRA status');
-    }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = _ok(response, 'Failed to get LoRA status');
     // The Modal endpoint wraps the payload in a `data` key – unwrap it.
     return (body['data'] as Map<String, dynamic>?) ?? body;
   }
@@ -817,14 +630,7 @@ class ApiClient {
       endpoint: '/audio/lora/load',
       data: {'lora_path': loraPath, 'adapter_name': ?adapterName},
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to load LoRA',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to load LoRA');
   }
 
   Future<Map<String, dynamic>> unloadLora() async {
@@ -832,10 +638,7 @@ class ApiClient {
       endpoint: '/audio/lora/unload',
       data: {},
     );
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to unload LoRA');
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to unload LoRA');
   }
 
   Future<Map<String, dynamic>> toggleLora(bool useLora) async {
@@ -843,10 +646,7 @@ class ApiClient {
       endpoint: '/audio/lora/toggle',
       data: {'use_lora': useLora},
     );
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to toggle LoRA');
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to toggle LoRA');
   }
 
   Future<Map<String, dynamic>> setLoraScale(
@@ -857,10 +657,7 @@ class ApiClient {
       endpoint: '/audio/lora/scale',
       data: {'scale': scale, 'adapter_name': ?adapterName},
     );
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to set LoRA scale');
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to set LoRA scale');
   }
 
   // ---------------------------------------------------------------------------
@@ -872,14 +669,7 @@ class ApiClient {
       endpoint: '/training/load_tensor_info',
       data: {'tensor_dir': tensorDir},
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to load tensor info',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to load tensor info');
   }
 
   Future<Map<String, dynamic>> startTraining(
@@ -889,14 +679,7 @@ class ApiClient {
       endpoint: '/training/start',
       data: params,
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to start training',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to start training');
   }
 
   Future<Map<String, dynamic>> startLoKRTraining(
@@ -906,25 +689,12 @@ class ApiClient {
       endpoint: '/training/start_lokr',
       data: params,
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to start LoKR training',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to start LoKR training');
   }
 
   Future<Map<String, dynamic>> getTrainingStatus() async {
     final response = await httpClient.get(endpoint: '/training/status');
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to get training status',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to get training status');
   }
 
   Future<void> stopTraining() async {
@@ -932,9 +702,7 @@ class ApiClient {
       endpoint: '/training/stop',
       data: {},
     );
-    if (response.statusCode != 200) {
-      throw ApiException(response.statusCode, 'Failed to stop training');
-    }
+    _ok(response, 'Failed to stop training');
   }
 
   Future<Map<String, dynamic>> exportLora({
@@ -945,14 +713,7 @@ class ApiClient {
       endpoint: '/training/export',
       data: {'export_path': exportPath, 'lora_output_dir': loraOutputDir},
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to export LoRA',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to export LoRA');
   }
 
   // ---------------------------------------------------------------------------
@@ -979,16 +740,7 @@ class ApiClient {
         'all_instrumental': allInstrumental.toString(),
       },
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['error'] as String? ??
-            body['message'] as String? ??
-            'Failed to upload dataset zip',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to upload dataset zip');
   }
 
   Future<Map<String, dynamic>> loadDataset(String datasetPath) async {
@@ -996,16 +748,7 @@ class ApiClient {
       endpoint: '/dataset/load',
       data: {'dataset_path': datasetPath},
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['error'] as String? ??
-            body['message'] as String? ??
-            'Failed to load dataset',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to load dataset');
   }
 
   Future<Map<String, dynamic>> startAutoLabel(
@@ -1015,42 +758,21 @@ class ApiClient {
       endpoint: '/dataset/auto_label_async',
       data: params,
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['error'] as String? ??
-            body['message'] as String? ??
-            'Failed to start auto-labeling',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to start auto-labeling');
   }
 
   Future<Map<String, dynamic>> getAutoLabelStatus() async {
     final response = await httpClient.get(
       endpoint: '/dataset/auto_label_status',
     );
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to get auto-label status',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to get auto-label status');
   }
 
   Future<Map<String, dynamic>> getAutoLabelTaskStatus(String taskId) async {
     final response = await httpClient.get(
       endpoint: '/dataset/auto_label_status/$taskId',
     );
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to get auto-label task status',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to get auto-label task status');
   }
 
   Future<Map<String, dynamic>> saveDataset(
@@ -1060,16 +782,7 @@ class ApiClient {
       endpoint: '/dataset/save',
       data: params,
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['error'] as String? ??
-            body['message'] as String? ??
-            'Failed to save dataset',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to save dataset');
   }
 
   Future<Map<String, dynamic>> startPreprocess(
@@ -1079,53 +792,26 @@ class ApiClient {
       endpoint: '/dataset/preprocess_async',
       data: params,
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['error'] as String? ??
-            body['message'] as String? ??
-            'Failed to start preprocessing',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to start preprocessing');
   }
 
   Future<Map<String, dynamic>> getPreprocessStatus() async {
     final response = await httpClient.get(
       endpoint: '/dataset/preprocess_status',
     );
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to get preprocess status',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to get preprocess status');
   }
 
   Future<Map<String, dynamic>> getPreprocessTaskStatus(String taskId) async {
     final response = await httpClient.get(
       endpoint: '/dataset/preprocess_status/$taskId',
     );
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to get preprocess task status',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to get preprocess task status');
   }
 
   Future<Map<String, dynamic>> getDatasetSamples() async {
     final response = await httpClient.get(endpoint: '/dataset/samples');
-    if (response.statusCode != 200) {
-      throw ApiException(
-        response.statusCode,
-        'Failed to get dataset samples',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to get dataset samples');
   }
 
   Future<Map<String, dynamic>> updateDatasetSample(
@@ -1136,16 +822,7 @@ class ApiClient {
       endpoint: '/dataset/sample/$idx',
       data: data,
     );
-    if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['error'] as String? ??
-            body['message'] as String? ??
-            'Failed to update dataset sample',
-      );
-    }
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return _ok(response, 'Failed to update dataset sample');
   }
 
   // ---------------------------------------------------------------------------
@@ -1163,12 +840,22 @@ class ApiClient {
       endpoint: '/browse',
       data: data,
     );
+    return _ok(response, 'Failed to browse directory');
+  }
+
+  /// Asserts [response] has status 200, decodes the JSON body and returns it.
+  /// On non-200 responses, tries to extract an error message from the body
+  /// before throwing [ApiException].
+  Map<String, dynamic> _ok(http.Response response, String fallback) {
     if (response.statusCode != 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      throw ApiException(
-        response.statusCode,
-        body['message'] as String? ?? 'Failed to browse directory',
-      );
+      String message = fallback;
+      try {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        message = body['error'] as String? ??
+            body['message'] as String? ??
+            fallback;
+      } catch (_) {}
+      throw ApiException(response.statusCode, message);
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }

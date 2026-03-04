@@ -1,4 +1,5 @@
 import 'package:studio_backend/src/audio/audio_model_client.dart';
+import 'package:studio_backend/src/audio/task_status_values.dart';
 
 /// Anticorruption layer for the MIDI generation model.
 ///
@@ -94,7 +95,7 @@ class MidiClient extends AudioModelClient {
       final response = await getRequest('/api/tasks/$taskId/');
       final status = response['status'] as String?;
 
-      if (status == 'complete') {
+      if (status == TaskStatusValues.complete) {
         final results = <Map<String, dynamic>>[];
         final downloadUrl = response['download_url'] as String?;
         final mp3DownloadUrl = response['mp3_download_url'] as String?;
@@ -111,7 +112,7 @@ class MidiClient extends AudioModelClient {
         return {'results': results};
       }
 
-      if (status == 'failed') {
+      if (status == TaskStatusValues.failed) {
         throw AudioModelException(
           500,
           'MIDI task $taskId failed: '

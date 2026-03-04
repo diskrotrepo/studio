@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:studio_backend/src/audio/dto/audio_generate_request.dart';
+import 'package:studio_backend/src/audio/task_status_values.dart';
 import 'package:studio_backend/src/database/database.dart';
 import 'package:studio_backend/src/database/postgres.dart';
 import 'package:studio_backend/src/utils/cursor_pagination.dart';
@@ -38,7 +39,7 @@ class AudioGenerationTaskRepositoryImpl
           taskId: Value(taskId),
           model: Value(request.model),
           taskType: Value(request.taskType),
-          status: const Value('processing'),
+          status: const Value(TaskStatusValues.processing),
           prompt: Value(request.prompt),
           lyrics: Value(request.lyrics),
           negativePrompt: Value(request.negativePrompt),
@@ -85,7 +86,7 @@ class AudioGenerationTaskRepositoryImpl
         taskId: taskId,
         model: request.model,
         taskType: request.taskType,
-        status: 'processing',
+        status: TaskStatusValues.processing,
         title: Value(request.title),
         prompt: Value(request.prompt),
         lyrics: Value(request.lyrics),
@@ -132,7 +133,7 @@ class AudioGenerationTaskRepositoryImpl
       _database.audioGenerationTask,
     )..where((t) => t.taskId.equals(taskId))).write(
       AudioGenerationTaskCompanion(
-        status: const Value('complete'),
+        status: const Value(TaskStatusValues.complete),
         result: Value(jsonEncode(result)),
         completedAt: Value(DateTime.now().toPgDateTime()),
       ),
@@ -148,7 +149,7 @@ class AudioGenerationTaskRepositoryImpl
       _database.audioGenerationTask,
     )..where((t) => t.taskId.equals(taskId))).write(
       AudioGenerationTaskCompanion(
-        status: const Value('failed'),
+        status: const Value(TaskStatusValues.failed),
         error: Value(error),
         completedAt: Value(DateTime.now().toPgDateTime()),
       ),
@@ -169,7 +170,7 @@ class AudioGenerationTaskRepositoryImpl
       ..where(
         (t) {
           var clause = t.userId.equals(userId) &
-              t.status.equals('complete') &
+              t.status.equals(TaskStatusValues.complete) &
               buildCursorWhereClause(t.createdAt, t.id, cursor,
                   descending: descending);
           if (rating != null) {
@@ -207,7 +208,7 @@ class AudioGenerationTaskRepositoryImpl
         taskId: taskId,
         model: 'upload',
         taskType: 'upload',
-        status: 'uploading',
+        status: TaskStatusValues.uploading,
         srcAudioPath: Value(objectPath),
         workspaceId: Value(workspaceId),
       ),
@@ -298,7 +299,7 @@ class AudioGenerationTaskRepositoryImpl
           ..where((t) =>
               t.lyricSheetId.equals(lyricSheetId) &
               t.userId.equals(userId) &
-              t.status.equals('complete'))
+              t.status.equals(TaskStatusValues.complete))
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
         .get();
   }
@@ -337,7 +338,7 @@ class AudioGenerationTaskRepositoryImpl
     final q = _database.select(_database.audioGenerationTask)
       ..where((t) {
         var clause = t.userId.equals(userId) &
-            t.status.equals('complete') &
+            t.status.equals(TaskStatusValues.complete) &
             t.lyrics.lower().like(pattern.toLowerCase()) &
             buildCursorWhereClause(t.createdAt, t.id, cursor,
                 descending: descending);
