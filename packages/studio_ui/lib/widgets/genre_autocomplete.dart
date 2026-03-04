@@ -32,6 +32,7 @@ class _GenreAutocompleteState extends State<GenreAutocomplete> {
   final _focusNode = FocusNode();
   List<MapEntry<String, MajorGenre>> _filteredResults = [];
   bool _showOverlay = false;
+  bool _isPointerOverOverlay = false;
   final _layerLink = LayerLink();
   OverlayEntry? _overlayEntry;
   int _highlightedIndex = 0;
@@ -90,7 +91,7 @@ class _GenreAutocompleteState extends State<GenreAutocomplete> {
     setState(() {}); // rebuild for border color
     if (!_focusNode.hasFocus) {
       Future.delayed(const Duration(milliseconds: 100), () {
-        if (mounted && !_focusNode.hasFocus) {
+        if (mounted && !_focusNode.hasFocus && !_isPointerOverOverlay) {
           _removeOverlay();
         }
       });
@@ -204,29 +205,33 @@ class _GenreAutocompleteState extends State<GenreAutocomplete> {
           link: _layerLink,
           showWhenUnlinked: false,
           offset: Offset(0, size.height + 4),
-          child: Material(
-            elevation: 0,
-            color: AppColors.surfaceHigh,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 200),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                shrinkWrap: true,
-                itemCount: _filteredResults.length,
-                itemBuilder: (context, index) {
-                  final genre = _filteredResults[index];
-                  final isHighlighted = index == _highlightedIndex;
-                  return _GenreOptionTile(
-                    genre: genre,
-                    highlighted: isHighlighted,
-                    onTap: () => _selectGenre(genre),
-                  );
-                },
+          child: MouseRegion(
+            onEnter: (_) => _isPointerOverOverlay = true,
+            onExit: (_) => _isPointerOverOverlay = false,
+            child: Material(
+              elevation: 0,
+              color: AppColors.surfaceHigh,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 200),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  shrinkWrap: true,
+                  itemCount: _filteredResults.length,
+                  itemBuilder: (context, index) {
+                    final genre = _filteredResults[index];
+                    final isHighlighted = index == _highlightedIndex;
+                    return _GenreOptionTile(
+                      genre: genre,
+                      highlighted: isHighlighted,
+                      onTap: () => _selectGenre(genre),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -355,7 +360,7 @@ class _GenreAutocompleteState extends State<GenreAutocomplete> {
   }
 }
 
-class _GenreOptionTile extends StatelessWidget {
+class _GenreOptionTile extends StatefulWidget {
   const _GenreOptionTile({
     required this.genre,
     required this.highlighted,
@@ -367,15 +372,24 @@ class _GenreOptionTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_GenreOptionTile> createState() => _GenreOptionTileState();
+}
+
+class _GenreOptionTileState extends State<_GenreOptionTile> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final color = genre.value.color;
+    final color = widget.genre.value.color;
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          color: highlighted ? Colors.white10 : Colors.transparent,
+          color: (_hovered || widget.highlighted) ? Colors.white10 : Colors.transparent,
           child: Row(
             children: [
               Container(
@@ -389,7 +403,7 @@ class _GenreOptionTile extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  genre.key,
+                  widget.genre.key,
                   style: const TextStyle(
                     color: AppColors.text,
                     fontSize: 12,
@@ -399,7 +413,7 @@ class _GenreOptionTile extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                genre.value.name,
+                widget.genre.value.name,
                 style: TextStyle(
                   color: color.withValues(alpha: 0.6),
                   fontSize: 10,
