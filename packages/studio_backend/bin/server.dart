@@ -43,8 +43,10 @@ Future<void> main(List<String> args) async {
       await dependencySetup(database);
 
       // Generate and persist the server's external user ID on first start.
-      final externalUserId =
-          await di.get<SettingsRepository>().ensureExternalUserId();
+
+      final externalUserId = await di
+          .get<SettingsRepository>()
+          .ensureExternalUserId();
       logger.d(message: 'External user ID: $externalUserId');
 
       final port = int.parse(Platform.environment['PORT'] ?? '80');
@@ -52,7 +54,6 @@ Future<void> main(List<String> args) async {
       final rootRouter = Router()
         ..mount('/v1/users', di.get<UserService>().router.call)
         ..mount('/v1/health', di.get<HealthService>().router.call);
-
 
       if (di.isRegistered<AudioService>()) {
         rootRouter.mount('/v1/audio', di.get<AudioService>().router.call);
@@ -64,40 +65,22 @@ Future<void> main(List<String> args) async {
 
       if (di.isRegistered<TrainingProxyService>()) {
         final trainingProxy = di.get<TrainingProxyService>();
-        rootRouter.mount(
-          '/v1/dataset',
-          trainingProxy.datasetRouter.call,
-        );
-        rootRouter.mount(
-          '/v1/training',
-          trainingProxy.trainingRouter.call,
-        );
+        rootRouter.mount('/v1/dataset', trainingProxy.datasetRouter.call);
+        rootRouter.mount('/v1/training', trainingProxy.trainingRouter.call);
       }
 
-      rootRouter.mount(
-        '/v1/settings',
-        di.get<SettingsService>().router.call,
-      );
+      rootRouter.mount('/v1/settings', di.get<SettingsService>().router.call);
 
       rootRouter.mount(
         '/v1/server-backends',
         di.get<ServerBackendService>().router.call,
       );
 
-      rootRouter.mount(
-        '/v1/peers',
-        di.get<PeerService>().router.call,
-      );
+      rootRouter.mount('/v1/peers', di.get<PeerService>().router.call);
 
-      rootRouter.mount(
-        '/v1/logs',
-        di.get<LogService>().router.call,
-      );
+      rootRouter.mount('/v1/logs', di.get<LogService>().router.call);
 
-      rootRouter.mount(
-        '/v1/browse',
-        di.get<BrowseService>().router.call,
-      );
+      rootRouter.mount('/v1/browse', di.get<BrowseService>().router.call);
 
       rootRouter.mount(
         '/v1/workspaces',
@@ -113,21 +96,27 @@ Future<void> main(List<String> args) async {
           .addMiddleware(_ignoreFavicon())
           .addMiddleware(_logUnhandledErrors())
           .addMiddleware(logRequests())
-          .addMiddleware(corsMiddleware(
-            allowedOrigins: Platform.environment['CORS_ALLOWED_ORIGINS']
-                ?.split(',')
-                .map((s) => s.trim())
-                .where((s) => s.isNotEmpty)
-                .toList(),
-          ))
-          .addMiddleware(signatureVerificationMiddleware(
-            peerRepository: di.get<PeerRepository>(),
-            settingsRepository: di.get<SettingsRepository>(),
-          ))
-          .addMiddleware(forwardingMiddleware(
-            serverBackendRepository: di.get<ServerBackendRepository>(),
-            settingsRepository: di.get<SettingsRepository>(),
-          ))
+          .addMiddleware(
+            corsMiddleware(
+              allowedOrigins: Platform.environment['CORS_ALLOWED_ORIGINS']
+                  ?.split(',')
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList(),
+            ),
+          )
+          .addMiddleware(
+            signatureVerificationMiddleware(
+              peerRepository: di.get<PeerRepository>(),
+              settingsRepository: di.get<SettingsRepository>(),
+            ),
+          )
+          .addMiddleware(
+            forwardingMiddleware(
+              serverBackendRepository: di.get<ServerBackendRepository>(),
+              settingsRepository: di.get<SettingsRepository>(),
+            ),
+          )
           .addMiddleware(userAutoCreateMiddleware(di.get<UserRepository>()))
           .addHandler(rootRouter.call);
 
