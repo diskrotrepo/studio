@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:studio_backend/src/audio/audio_client.dart';
+import 'package:studio_backend/src/audio/task_status_values.dart';
 import 'package:studio_backend/src/audio/audio_generation_task_repository.dart';
 import 'package:studio_backend/src/audio/audio_model_client.dart';
 import 'package:studio_backend/src/audio/dto/audio_generate_request.dart';
@@ -695,7 +696,7 @@ class AudioService {
     await _setTask(
       _TaskStatus(
         taskId: taskId,
-        status: 'processing',
+        status: TaskStatusValues.processing,
         taskType: generateRequest.taskType,
         model: generateRequest.model,
       ),
@@ -740,10 +741,10 @@ class AudioService {
       if (task.model != null) 'model': task.model,
     };
 
-    if (task.status == 'complete' && task.result != null) {
+    if (task.status == TaskStatusValues.complete && task.result != null) {
       response['result'] = task.result;
     }
-    if (task.status == 'failed' && task.error != null) {
+    if (task.status == TaskStatusValues.failed && task.error != null) {
       response['error'] = task.error;
     }
 
@@ -765,7 +766,7 @@ class AudioService {
       await _setTask(
         _TaskStatus(
           taskId: taskId,
-          status: 'complete',
+          status: TaskStatusValues.complete,
           taskType: prev?.taskType ?? 'unknown',
           model: prev?.model,
           result: result,
@@ -787,7 +788,7 @@ class AudioService {
       await _setTask(
         _TaskStatus(
           taskId: taskId,
-          status: 'failed',
+          status: TaskStatusValues.failed,
           taskType: prev?.taskType ?? 'unknown',
           model: prev?.model,
           error: 'Generation failed',

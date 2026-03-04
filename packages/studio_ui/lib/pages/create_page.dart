@@ -952,7 +952,7 @@ class _CreatePageState extends State<CreatePage> {
       final taskId = await client.submitTask(body);
       final status = TaskStatus(
         taskId: taskId,
-        status: 'processing',
+        status: TaskStatus.statusProcessing,
         taskType: _taskType,
         model: _model,
       );
@@ -1008,7 +1008,7 @@ class _CreatePageState extends State<CreatePage> {
       setState(() {
         _tasks.insert(
           0,
-          TaskStatus(taskId: fileId, status: 'uploading', taskType: 'upload'),
+          TaskStatus(taskId: fileId, status: TaskStatus.statusUploading, taskType: 'upload'),
         );
         _uploadProgress = 0.2;
       });
@@ -1034,7 +1034,7 @@ class _CreatePageState extends State<CreatePage> {
           setState(() {
             _tasks[index] = TaskStatus(
               taskId: fileId,
-              status: 'complete',
+              status: TaskStatus.statusComplete,
               taskType: 'upload',
             );
             _pickedFile = null;
@@ -5146,10 +5146,10 @@ class _TaskCardState extends State<_TaskCard>
   Widget _statusBadge() {
     final s = S.of(context);
     final (color, label) = switch (widget.task.status) {
-      'processing' => (AppColors.controlPink, s.statusProcessing),
-      'uploading' => (Colors.orange, s.statusUploading),
-      'complete' => (Colors.green, s.statusComplete),
-      'failed' => (Colors.redAccent, s.statusFailed),
+      TaskStatus.statusProcessing => (AppColors.controlPink, s.statusProcessing),
+      TaskStatus.statusUploading => (Colors.orange, s.statusUploading),
+      TaskStatus.statusComplete => (Colors.green, s.statusComplete),
+      TaskStatus.statusFailed => (Colors.redAccent, s.statusFailed),
       _ => (AppColors.textMuted, widget.task.status),
     };
 
