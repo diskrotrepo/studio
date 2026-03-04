@@ -1,5 +1,9 @@
 # Studio Project Rules
 
+## Branch Safety
+
+- **Before making ANY changes**, always check that the user is NOT on the `main` or `stable` branch. Run `git branch --show-current` first. If on `main` or `stable`, STOP and tell the user to create/switch to a feature branch before proceeding.
+
 ## UI / Flutter
 
 - Never use mobile-style animations or transitions in the Flutter app. This is a desktop application. Avoid `AnimatedContainer`, `AnimatedCrossFade`, `AnimatedRotation`, `AnimatedSwitcher`, `AnimatedOpacity`, `SlideTransition`, `FadeTransition`, swipe gestures, and similar animated widgets. Use instant state changes (e.g. `if`/`switch` conditionals, `Container`, `Transform.rotate`) instead.

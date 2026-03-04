@@ -11,12 +11,6 @@ class Configuration {
   final bool secure;
   final String applicationId;
 
-  Uri buildUri(String path, [Map<String, dynamic>? query]) {
-    return secure
-        ? Uri.https(apiHost, path, query)
-        : Uri.http(apiHost, path, query);
-  }
-
   static String environmentLookup() {
     const envFromDefine = String.fromEnvironment('BUILD_ENV');
     if (envFromDefine.isNotEmpty) return envFromDefine;
