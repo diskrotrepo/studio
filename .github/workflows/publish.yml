@@ -6,6 +6,10 @@ on:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
+      all:
+        description: "Rebuild ALL images"
+        type: boolean
+        default: false
       backend:
         description: "Rebuild Backend"
         type: boolean
@@ -92,7 +96,7 @@ jobs:
   backend-amd64:
     name: Backend (amd64)
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.backend == true
+    if: needs.changes.outputs.backend == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.backend == true || inputs.all == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -127,7 +131,7 @@ jobs:
   backend-arm64:
     name: Backend (arm64)
     needs: changes
-    if: needs.changes.outputs.backend == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.backend == true
+    if: needs.changes.outputs.backend == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.backend == true || inputs.all == true
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -178,7 +182,7 @@ jobs:
   ui-amd64:
     name: UI (amd64)
     needs: changes
-    if: needs.changes.outputs.ui == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.ui == true
+    if: needs.changes.outputs.ui == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.ui == true || inputs.all == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -214,7 +218,7 @@ jobs:
   ui-arm64:
     name: UI (arm64)
     needs: changes
-    if: needs.changes.outputs.ui == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.ui == true
+    if: needs.changes.outputs.ui == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.ui == true || inputs.all == true
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -266,7 +270,7 @@ jobs:
   acestep-cpu-amd64:
     name: ACE-Step CPU (amd64)
     needs: changes
-    if: needs.changes.outputs.acestep == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['acestep-cpu'] == true
+    if: needs.changes.outputs.acestep == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['acestep-cpu'] == true || inputs.all == true
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -299,7 +303,7 @@ jobs:
   acestep-cpu-arm64:
     name: ACE-Step CPU (arm64)
     needs: changes
-    if: needs.changes.outputs.acestep == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['acestep-cpu'] == true
+    if: needs.changes.outputs.acestep == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['acestep-cpu'] == true || inputs.all == true
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Free disk space
@@ -348,7 +352,7 @@ jobs:
   acestep-cuda:
     name: ACE-Step (CUDA)
     needs: changes
-    if: needs.changes.outputs.acestep == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['acestep-cuda'] == true
+    if: needs.changes.outputs.acestep == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['acestep-cuda'] == true || inputs.all == true
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -381,7 +385,7 @@ jobs:
   yulan-cpu-amd64:
     name: YuLan CPU (amd64)
     needs: changes
-    if: needs.changes.outputs.yulan == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['yulan-cpu'] == true
+    if: needs.changes.outputs.yulan == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['yulan-cpu'] == true || inputs.all == true
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -414,7 +418,7 @@ jobs:
   yulan-cpu-arm64:
     name: YuLan CPU (arm64)
     needs: changes
-    if: needs.changes.outputs.yulan == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['yulan-cpu'] == true
+    if: needs.changes.outputs.yulan == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['yulan-cpu'] == true || inputs.all == true
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -458,7 +462,7 @@ jobs:
   yulan-cuda:
     name: YuLan (CUDA)
     needs: changes
-    if: needs.changes.outputs.yulan == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['yulan-cuda'] == true
+    if: needs.changes.outputs.yulan == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['yulan-cuda'] == true || inputs.all == true
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -491,7 +495,7 @@ jobs:
   bark-cpu-amd64:
     name: Bark CPU (amd64)
     needs: changes
-    if: needs.changes.outputs.bark == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['bark-cpu'] == true
+    if: needs.changes.outputs.bark == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['bark-cpu'] == true || inputs.all == true
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -524,7 +528,7 @@ jobs:
   bark-cpu-arm64:
     name: Bark CPU (arm64)
     needs: changes
-    if: needs.changes.outputs.bark == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['bark-cpu'] == true
+    if: needs.changes.outputs.bark == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['bark-cpu'] == true || inputs.all == true
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Free disk space
@@ -573,7 +577,7 @@ jobs:
   bark-cuda:
     name: Bark (CUDA)
     needs: changes
-    if: needs.changes.outputs.bark == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['bark-cuda'] == true
+    if: needs.changes.outputs.bark == 'true' || startsWith(github.ref, 'refs/tags/') || inputs['bark-cuda'] == true || inputs.all == true
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -606,7 +610,7 @@ jobs:
   midi-amd64:
     name: MIDI (amd64)
     needs: changes
-    if: needs.changes.outputs.midi == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.midi == true
+    if: needs.changes.outputs.midi == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.midi == true || inputs.all == true
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
@@ -638,7 +642,7 @@ jobs:
   midi-arm64:
     name: MIDI (arm64)
     needs: changes
-    if: needs.changes.outputs.midi == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.midi == true
+    if: needs.changes.outputs.midi == 'true' || startsWith(github.ref, 'refs/tags/') || inputs.midi == true || inputs.all == true
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Free disk space
