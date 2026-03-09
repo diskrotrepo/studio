@@ -4,7 +4,7 @@
 :: First run: installs prerequisites (WSL, Docker, NVIDIA drivers) and launches.
 :: Subsequent runs: pulls latest images and restarts the stack.
 ::
-:: Only starts postgres, redis, studio-backend, and studio-ui — the minimum
+:: Only starts postgres, redis, studio-backend, and studio-ui -- the minimum
 :: services required to communicate with a remote studio///diskrot instance.
 
 chcp 65001 >nul 2>&1

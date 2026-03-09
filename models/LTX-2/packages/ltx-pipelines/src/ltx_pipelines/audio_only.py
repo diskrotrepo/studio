@@ -4,6 +4,7 @@ import logging
 import torch
 
 from ltx_core.components.diffusion_steps import EulerDiffusionStep
+from ltx_core.components.guiders import MultiModalGuiderParams, create_multimodal_guider_factory
 from ltx_core.components.noisers import GaussianNoiser
 from ltx_core.components.protocols import DiffusionStepProtocol
 from ltx_core.loader import LoraPathStrengthAndSDOps
@@ -18,6 +19,7 @@ from ltx_pipelines.utils.helpers import (
     denoise_audio_only,
     encode_prompts,
     get_device,
+    guided_audio_only_denoising_func,
     simple_audio_only_denoising_func,
 )
 from ltx_pipelines.utils.media_io import encode_audio_wav
@@ -67,17 +69,33 @@ class AudioOnlyPipeline:
         num_frames: int,
         frame_rate: float,
         enhance_prompt: bool = False,
+        negative_prompt: str = "",
+        audio_cfg_guidance_scale: float = 7.0,
+        audio_stg_guidance_scale: float = 1.0,
+        audio_rescale_scale: float = 0.7,
     ) -> Audio:
         generator = torch.Generator(device=self.device).manual_seed(seed)
         noiser = GaussianNoiser(generator=generator)
         stepper = EulerDiffusionStep()
         dtype = torch.bfloat16
 
-        (ctx_p,) = encode_prompts(
-            [prompt],
-            self.model_ledger,
-            enhance_first_prompt=enhance_prompt,
-        )
+        use_guidance = audio_cfg_guidance_scale != 1.0 or audio_stg_guidance_scale > 0.0
+
+        if negative_prompt and use_guidance:
+            ctx_p, ctx_n = encode_prompts(
+                [prompt, negative_prompt],
+                self.model_ledger,
+                enhance_first_prompt=enhance_prompt,
+            )
+            negative_audio_context = ctx_n.audio_encoding
+        else:
+            (ctx_p,) = encode_prompts(
+                [prompt],
+                self.model_ledger,
+                enhance_first_prompt=enhance_prompt,
+            )
+            negative_audio_context = None
+
         audio_context = ctx_p.audio_encoding
 
         transformer = self.model_ledger.transformer()
@@ -91,6 +109,30 @@ class AudioOnlyPipeline:
             fps=frame_rate,
         )
 
+        if use_guidance:
+            audio_guider_params = MultiModalGuiderParams(
+                cfg_scale=audio_cfg_guidance_scale,
+                stg_scale=audio_stg_guidance_scale,
+                rescale_scale=audio_rescale_scale,
+                modality_scale=1.0,
+                skip_step=0,
+                stg_blocks=[29],
+            )
+            audio_guider_factory = create_multimodal_guider_factory(
+                params=audio_guider_params,
+                negative_context=negative_audio_context,
+            )
+            denoise_fn = guided_audio_only_denoising_func(
+                audio_guider_factory=audio_guider_factory,
+                audio_context=audio_context,
+                transformer=transformer,
+            )
+        else:
+            denoise_fn = simple_audio_only_denoising_func(
+                audio_context=audio_context,
+                transformer=transformer,
+            )
+
         def denoising_loop(
             sigmas: torch.Tensor, video_state: LatentState, audio_state: LatentState, stepper: DiffusionStepProtocol
         ) -> tuple[LatentState, LatentState]:
@@ -99,10 +141,7 @@ class AudioOnlyPipeline:
                 video_state=video_state,
                 audio_state=audio_state,
                 stepper=stepper,
-                denoise_fn=simple_audio_only_denoising_func(
-                    audio_context=audio_context,
-                    transformer=transformer,
-                ),
+                denoise_fn=denoise_fn,
             )
 
         audio_state = denoise_audio_only(

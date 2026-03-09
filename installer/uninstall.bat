@@ -1,5 +1,5 @@
 @echo off
-:: studio///diskrot — Uninstaller
+:: studio///diskrot -- Uninstaller
 :: Double-click to stop the stack and optionally remove data.
 
 :: Check for admin rights

@@ -1,5 +1,5 @@
 @echo off
-:: studio///diskrot — Rebuild backend + UI from source (Windows)
+:: studio///diskrot -- Rebuild backend + UI from source (Windows)
 ::
 :: Builds only studio-backend and studio-ui, then starts the full stack.
 :: For all images (including acestep + yulan), use dev-all.bat instead.

@@ -1,5 +1,5 @@
 @echo off
-:: studio///diskrot — Developer Environment Setup (Windows)
+:: studio///diskrot -- Developer Environment Setup (Windows)
 ::
 :: Installs development prerequisites, configures the environment, fetches
 :: dependencies, runs code generation, and starts supporting Docker services.
@@ -25,7 +25,7 @@ powershell -ExecutionPolicy Bypass -File "%~dp0setup-dev.ps1" %PS_ARGS%
 exit /b %ERRORLEVEL%
 
 :show_help
-echo studio///diskrot — Developer Environment Setup (Windows)
+echo studio///diskrot -- Developer Environment Setup (Windows)
 echo.
 echo Usage:
 echo   setup-dev.bat                Full setup

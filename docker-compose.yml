@@ -301,6 +301,7 @@ services:
       LTX_API_HOST: 0.0.0.0
       LTX_API_PORT: "8005"
       LTX_API_KEY: ${LTX_API_KEY:-}
+      HF_TOKEN: ${HF_TOKEN:-}
     volumes:
       - ./data/ltx-checkpoints:/app/checkpoints
       - ./data/ltx-output:/data/output

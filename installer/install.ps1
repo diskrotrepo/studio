@@ -530,7 +530,9 @@ function Invoke-Install {
         "data/acestep-checkpoints",
         "data/acestep-output",
         "data/yulan-hf-cache",
-        "data/yulan-gguf"
+        "data/yulan-gguf",
+        "data/ltx-checkpoints",
+        "data/ltx-output"
     )
     foreach ($dir in $dataDirs) {
         $fullPath = Join-Path $projectDir $dir
@@ -601,6 +603,8 @@ function Invoke-Install {
             "ACESTEP_VARIANT=$variant",
             "# YuLan-Mini: `"cuda`" for GPU, `"cpu`" for CPU-only",
             "YULAN_VARIANT=$variant",
+            "# LTX: `"cuda`" for GPU, `"cpu`" for CPU-only",
+            "LTX_VARIANT=$variant",
             "# GPU compose overlay (semicolon separator on Windows)",
             "$composeLine",
             "# Hugging Face token for model downloads (get one at https://huggingface.co/settings/tokens)",
