@@ -38,6 +38,15 @@ services:
               count: 1
               capabilities: [gpu]
 
+  ltx:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
   # midi:
   #   deploy:
   #     resources:

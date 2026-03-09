@@ -73,6 +73,7 @@ String _taskTypeDescription(String taskType, S s) => switch (taskType) {
 
 String _modelDisplayName(String model) => switch (model) {
       'ace_step_15' => 'ACE Step 1.5',
+      'ltx' => 'LTX-2',
       _ => model,
     };
 
@@ -80,6 +81,7 @@ Widget _modelBadge(String model) {
   final color = switch (model) {
     'bark' => const Color(0xFFE091A5),
     'ace_step_15' => const Color(0xFFB39DDB),
+    'ltx' => const Color(0xFF4FC3F7),
     _ => AppColors.textMuted,
   };
   return ConstrainedBox(
@@ -135,6 +137,20 @@ final _fallbackCapabilities = <String, ModelCapabilities>{
     taskTypes: ['generate', 'generate_long'],
     parameters: ['prompt', 'temperature'],
     features: {'lora': false, 'lyrics': false, 'negative_prompt': false},
+  ),
+  'ltx': ModelCapabilities(
+    model: 'ltx',
+    enabled: true,
+    taskTypes: ['generate'],
+    parameters: [
+      'prompt',
+      'negative_prompt',
+      'guidance_scale',
+      'inference_steps',
+      'audio_duration',
+      'batch_size',
+    ],
+    features: {'lora': true, 'lyrics': false, 'negative_prompt': true},
   ),
 };
 
@@ -1112,6 +1128,10 @@ class _CreatePageState extends State<CreatePage> {
                     DropdownMenuItem(
                       value: 'bark',
                       child: Text(s.modelBark),
+                    ),
+                    DropdownMenuItem(
+                      value: 'ltx',
+                      child: Text(s.modelLtx),
                     ),
                   ],
                   onChanged: (v) {
