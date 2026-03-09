@@ -300,6 +300,7 @@ services:
       LTX_DEVICE: ${LTX_VARIANT:-cpu}
       LTX_API_HOST: 0.0.0.0
       LTX_API_PORT: "8005"
+      LTX_GEMMA_4BIT: "true"
       LTX_API_KEY: ${LTX_API_KEY:-}
       HF_TOKEN: ${HF_TOKEN:-}
     volumes:

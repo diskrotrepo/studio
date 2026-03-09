@@ -44,6 +44,7 @@ class AudioOnlyPipeline:
         loras: list[LoraPathStrengthAndSDOps],
         device: torch.device = device,
         quantization: QuantizationPolicy | None = None,
+        gemma_4bit: bool = False,
     ):
         self.device = device
         self.dtype = torch.bfloat16
@@ -55,6 +56,7 @@ class AudioOnlyPipeline:
             gemma_root_path=gemma_root,
             loras=loras,
             quantization=quantization,
+            gemma_4bit=gemma_4bit,
         )
 
         self.pipeline_components = PipelineComponents(

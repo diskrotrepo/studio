@@ -38,7 +38,7 @@ class EmbeddingsProcessor(nn.Module):
         self,
         *,
         feature_extractor: nn.Module | None = None,
-        video_connector: Embeddings1DConnector,
+        video_connector: Embeddings1DConnector | None = None,
         audio_connector: Embeddings1DConnector | None = None,
     ):
         super().__init__()
@@ -48,23 +48,33 @@ class EmbeddingsProcessor(nn.Module):
 
     def create_embeddings(
         self,
-        video_features: torch.Tensor,
+        video_features: torch.Tensor | None,
         audio_features: torch.Tensor | None,
         additive_attention_mask: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor]:
+    ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor]:
         if self.audio_connector is not None and audio_features is None:
             raise ValueError("Audio connector is configured but no audio features were provided.")
         if self.audio_connector is None and audio_features is not None:
             raise ValueError("Audio features were provided but no audio connector is configured.")
 
-        video_encoded, video_mask = self.video_connector(video_features, additive_attention_mask)
-        video_encoded, binary_mask = _to_binary_mask(video_encoded, video_mask)
+        video_encoded = None
+        binary_mask = None
+        if self.video_connector is not None and video_features is not None:
+            video_encoded, video_mask = self.video_connector(video_features, additive_attention_mask)
+            video_encoded, binary_mask = _to_binary_mask(video_encoded, video_mask)
+            binary_mask = binary_mask.squeeze(-1)
 
         audio_encoded = None
         if self.audio_connector is not None:
-            audio_encoded, _ = self.audio_connector(audio_features, additive_attention_mask)
+            audio_encoded, audio_mask = self.audio_connector(audio_features, additive_attention_mask)
+            if binary_mask is None:
+                _, binary_mask = _to_binary_mask(audio_encoded, audio_mask)
+                binary_mask = binary_mask.squeeze(-1)
 
-        return video_encoded, audio_encoded, binary_mask.squeeze(-1)
+        if binary_mask is None:
+            raise ValueError("At least one connector (video or audio) must be configured.")
+
+        return video_encoded, audio_encoded, binary_mask
 
     def process_hidden_states(
         self,
@@ -84,6 +94,8 @@ class EmbeddingsProcessor(nn.Module):
             raise ValueError("feature_extractor is required for process_hidden_states()")
 
         video_feats, audio_feats = self.feature_extractor(hidden_states, attention_mask, padding_side)
-        additive_mask = convert_to_additive_mask(attention_mask, video_feats.dtype)
+        # Use whichever features are available for mask dtype
+        ref_feats = video_feats if video_feats is not None else audio_feats
+        additive_mask = convert_to_additive_mask(attention_mask, ref_feats.dtype)
         video_enc, audio_enc, binary_mask = self.create_embeddings(video_feats, audio_feats, additive_mask)
         return EmbeddingsProcessorOutput(video_enc, audio_enc, binary_mask)

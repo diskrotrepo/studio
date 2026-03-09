@@ -63,7 +63,8 @@ RUN pip install --no-cache-dir \
     pillow \
     "fastapi>=0.110.0" \
     "uvicorn[standard]>=0.27.0" \
-    huggingface_hub
+    huggingface_hub \
+    bitsandbytes
 
 # ---- Copy source and install packages ----
 COPY . /app

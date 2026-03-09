@@ -10,19 +10,23 @@ from ltx_core.text_encoders.gemma.encoders.base_encoder import (
     module_ops_from_gemma_root,
 )
 from ltx_core.text_encoders.gemma.encoders.encoder_configurator import (
+    AUDIO_ONLY_EMBEDDINGS_PROCESSOR_KEY_OPS,
     EMBEDDINGS_PROCESSOR_KEY_OPS,
     GEMMA_LLM_KEY_OPS,
     GEMMA_MODEL_OPS,
     VIDEO_ONLY_EMBEDDINGS_PROCESSOR_KEY_OPS,
+    AudioOnlyEmbeddingsProcessorConfigurator,
     EmbeddingsProcessorConfigurator,
     GemmaTextEncoderConfigurator,
 )
 
 __all__ = [
+    "AUDIO_ONLY_EMBEDDINGS_PROCESSOR_KEY_OPS",
     "EMBEDDINGS_PROCESSOR_KEY_OPS",
     "GEMMA_LLM_KEY_OPS",
     "GEMMA_MODEL_OPS",
     "VIDEO_ONLY_EMBEDDINGS_PROCESSOR_KEY_OPS",
+    "AudioOnlyEmbeddingsProcessorConfigurator",
     "EmbeddingsProcessor",
     "EmbeddingsProcessorConfigurator",
     "EmbeddingsProcessorOutput",

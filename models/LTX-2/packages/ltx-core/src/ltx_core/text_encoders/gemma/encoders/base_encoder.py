@@ -1,4 +1,7 @@
 import functools
+import logging
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 
 import torch
@@ -7,6 +10,8 @@ from transformers import AutoImageProcessor, Gemma3ForConditionalGeneration, Gem
 from ltx_core.loader.module_ops import ModuleOps
 from ltx_core.text_encoders.gemma.tokenizer import LTXVGemmaTokenizer
 from ltx_core.utils import find_matching_file
+
+logger = logging.getLogger(__name__)
 
 
 class GemmaTextEncoder(torch.nn.Module):
@@ -200,3 +205,61 @@ def module_ops_from_gemma_root(gemma_root: str) -> tuple[ModuleOps, ...]:
         mutator=load_processor,
     )
     return (tokenizer_load_ops, processor_load_ops)
+
+
+def load_4bit_gemma(gemma_root: str, dtype: torch.dtype = torch.bfloat16) -> GemmaTextEncoder:
+    """Load the Gemma text encoder in 4-bit precision using bitsandbytes.
+
+    Uses ``from_pretrained`` with ``BitsAndBytesConfig(load_in_4bit=True)`` to
+    quantize the 12B Gemma backbone to ~6 GB instead of ~24 GB at bfloat16.
+
+    Args:
+        gemma_root: Root directory containing the Gemma model files.
+        dtype: Compute dtype for non-quantized weights.
+
+    Returns:
+        GemmaTextEncoder with 4-bit quantized Gemma backbone, tokenizer, and processor loaded.
+    """
+    try:
+        from transformers import BitsAndBytesConfig  # noqa: PLC0415
+    except ImportError as e:
+        raise ImportError(
+            "4-bit text encoder loading requires bitsandbytes. "
+            "Install it with: pip install bitsandbytes"
+        ) from e
+
+    model_path = str(find_matching_file(gemma_root, "model*.safetensors").parent)
+    tokenizer_path = str(find_matching_file(gemma_root, "tokenizer.model").parent)
+    processor_path = str(find_matching_file(gemma_root, "preprocessor_config.json").parent)
+
+    logger.info("Loading Gemma text encoder in 4-bit from %s", model_path)
+    quantization_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=dtype,
+    )
+
+    accelerate_logger = logging.getLogger("accelerate.utils.modeling")
+    old_level = accelerate_logger.level
+    accelerate_logger.setLevel(logging.WARNING)
+    try:
+        gemma_model = Gemma3ForConditionalGeneration.from_pretrained(
+            model_path,
+            quantization_config=quantization_config,
+            torch_dtype=dtype,
+            device_map="auto",
+            local_files_only=True,
+        )
+    finally:
+        accelerate_logger.setLevel(old_level)
+
+    tokenizer = LTXVGemmaTokenizer(tokenizer_path, 1024)
+    image_processor = AutoImageProcessor.from_pretrained(processor_path, local_files_only=True)
+    processor = Gemma3Processor(image_processor=image_processor, tokenizer=tokenizer.tokenizer)
+
+    logger.info("Gemma text encoder loaded in 4-bit")
+    return GemmaTextEncoder(
+        model=gemma_model,
+        tokenizer=tokenizer,
+        processor=processor,
+        dtype=dtype,
+    )

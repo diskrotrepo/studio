@@ -114,8 +114,8 @@ class FeatureExtractorV2(nn.Module):
 
     def __init__(
         self,
-        video_aggregate_embed: nn.Linear,
         embedding_dim: int,
+        video_aggregate_embed: nn.Linear | None = None,
         audio_aggregate_embed: nn.Linear | None = None,
     ):
         super().__init__()
@@ -128,12 +128,14 @@ class FeatureExtractorV2(nn.Module):
         hidden_states: torch.Tensor,
         attention_mask: torch.Tensor,
         padding_side: str = "left",  # noqa: ARG002
-    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+    ) -> tuple[torch.Tensor | None, torch.Tensor | None]:
         encoded = torch.stack(hidden_states, dim=-1) if isinstance(hidden_states, (list, tuple)) else hidden_states
         normed = norm_and_concat_per_token_rms(encoded, attention_mask)
-        normed = normed.to(self.video_aggregate_embed.weight.dtype)
-        v_dim = self.video_aggregate_embed.out_features
-        video = self.video_aggregate_embed(_rescale_norm(normed, v_dim, self.embedding_dim))
+        video = None
+        if self.video_aggregate_embed is not None:
+            normed_v = normed.to(self.video_aggregate_embed.weight.dtype)
+            v_dim = self.video_aggregate_embed.out_features
+            video = self.video_aggregate_embed(_rescale_norm(normed_v, v_dim, self.embedding_dim))
         audio = None
         if self.audio_aggregate_embed is not None:
             a_dim = self.audio_aggregate_embed.out_features

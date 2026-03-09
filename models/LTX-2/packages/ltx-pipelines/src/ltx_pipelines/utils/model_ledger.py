@@ -34,9 +34,11 @@ from ltx_core.model.video_vae import (
 )
 from ltx_core.quantization import QuantizationPolicy
 from ltx_core.text_encoders.gemma import (
+    AUDIO_ONLY_EMBEDDINGS_PROCESSOR_KEY_OPS,
     EMBEDDINGS_PROCESSOR_KEY_OPS,
     GEMMA_LLM_KEY_OPS,
     GEMMA_MODEL_OPS,
+    AudioOnlyEmbeddingsProcessorConfigurator,
     EmbeddingsProcessor,
     EmbeddingsProcessorConfigurator,
     GemmaTextEncoder,
@@ -375,6 +377,7 @@ class AudioOnlyModelLedger(ModelLedger):
         loras: tuple[LoraPathStrengthAndSDOps, ...] = (),
         registry: Registry | None = None,
         quantization: QuantizationPolicy | None = None,
+        gemma_4bit: bool = False,
     ):
         # Skip ModelLedger.__init__ to avoid building video builders,
         # call grandparent init directly and then build our own builders.
@@ -386,6 +389,7 @@ class AudioOnlyModelLedger(ModelLedger):
         self.loras = loras
         self.registry = registry or StateDictRegistry()
         self.quantization = quantization
+        self.gemma_4bit = gemma_4bit
         self._model_cache: dict[str, object] = {}
         self.build_model_builders()
 
@@ -415,12 +419,12 @@ class AudioOnlyModelLedger(ModelLedger):
 
             self.embeddings_processor_builder = Builder(
                 model_path=self.checkpoint_path,
-                model_class_configurator=EmbeddingsProcessorConfigurator,
-                model_sd_ops=EMBEDDINGS_PROCESSOR_KEY_OPS,
+                model_class_configurator=AudioOnlyEmbeddingsProcessorConfigurator,
+                model_sd_ops=AUDIO_ONLY_EMBEDDINGS_PROCESSOR_KEY_OPS,
                 registry=self.registry,
             )
 
-            if self.gemma_root_path is not None:
+            if self.gemma_root_path is not None and not self.gemma_4bit:
                 module_ops = module_ops_from_gemma_root(self.gemma_root_path)
                 model_folder = find_matching_file(self.gemma_root_path, "model*.safetensors").parent
                 weight_paths = [str(p) for p in model_folder.rglob("*.safetensors")]
@@ -433,6 +437,19 @@ class AudioOnlyModelLedger(ModelLedger):
                     module_ops=(GEMMA_MODEL_OPS, *module_ops),
                 )
 
+    def text_encoder(self) -> GemmaTextEncoder:
+        if "text_encoder" in self._model_cache:
+            return self._model_cache["text_encoder"]
+
+        if self.gemma_4bit and self.gemma_root_path is not None:
+            from ltx_core.text_encoders.gemma.encoders.base_encoder import load_4bit_gemma  # noqa: PLC0415
+
+            model = load_4bit_gemma(self.gemma_root_path, dtype=self.dtype)
+            self._model_cache["text_encoder"] = model
+            return model
+
+        return super().text_encoder()
+
     def with_loras(self, loras: tuple[LoraPathStrengthAndSDOps, ...]) -> "AudioOnlyModelLedger":
         return AudioOnlyModelLedger(
             dtype=self.dtype,
@@ -442,4 +459,5 @@ class AudioOnlyModelLedger(ModelLedger):
             loras=loras,
             registry=self.registry,
             quantization=self.quantization,
+            gemma_4bit=self.gemma_4bit,
         )

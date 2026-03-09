@@ -51,6 +51,26 @@ class EmbeddingsProcessorConfigurator(ModelConfigurator[EmbeddingsProcessor]):
         )
 
 
+class AudioOnlyEmbeddingsProcessorConfigurator(ModelConfigurator[EmbeddingsProcessor]):
+    """Configurator that only creates audio connector and audio feature extractor — no video components."""
+
+    @classmethod
+    def from_config(cls, config: dict) -> EmbeddingsProcessor:
+        transformer_config = config.get("transformer", {})
+
+        # Audio connector only
+        audio_connector = AudioEmbeddings1DConnectorConfigurator.from_config(config)
+
+        # Audio-only feature extractor
+        feature_extractor = _create_audio_only_feature_extractor(transformer_config)
+
+        return EmbeddingsProcessor(
+            video_connector=None,
+            audio_connector=audio_connector,
+            feature_extractor=feature_extractor,
+        )
+
+
 _V2_EXPECTED_CONFIG = {
     "caption_proj_before_connector": True,
     "caption_projection_first_linear": False,
@@ -92,8 +112,8 @@ def _create_feature_extractor(transformer_config: dict) -> torch.nn.Module:
     video_inner_dim = transformer_config["num_attention_heads"] * transformer_config["attention_head_dim"]
     audio_inner_dim = transformer_config["audio_num_attention_heads"] * transformer_config["audio_attention_head_dim"]
     return FeatureExtractorV2(
-        video_aggregate_embed=torch.nn.Linear(flat_dim, video_inner_dim, bias=True),
         embedding_dim=embedding_dim,
+        video_aggregate_embed=torch.nn.Linear(flat_dim, video_inner_dim, bias=True),
         audio_aggregate_embed=torch.nn.Linear(flat_dim, audio_inner_dim, bias=True),
     )
 
@@ -134,6 +154,39 @@ EMBEDDINGS_PROCESSOR_KEY_OPS = (
     # 2. Map the connectors
     .with_matching(prefix="model.diffusion_model.video_embeddings_connector.")
     .with_replacement("model.diffusion_model.video_embeddings_connector.", "video_connector.")
+    .with_matching(prefix="model.diffusion_model.audio_embeddings_connector.")
+    .with_replacement("model.diffusion_model.audio_embeddings_connector.", "audio_connector.")
+)
+
+def _create_audio_only_feature_extractor(transformer_config: dict) -> torch.nn.Module:
+    """Create a feature extractor with only audio projection — no video aggregate embed."""
+    gemma_text_config = GEMMA3_CONFIG_FOR_LTX.text_config
+    embedding_dim = gemma_text_config.hidden_size
+    num_layers = gemma_text_config.num_hidden_layers + 1
+    flat_dim = embedding_dim * num_layers
+
+    overlapping_keys = transformer_config.keys() & _V2_EXPECTED_CONFIG.keys()
+    if not overlapping_keys:
+        # V1: shared aggregate_embed is used for both video and audio
+        aggregate_embed = torch.nn.Linear(flat_dim, embedding_dim, bias=False)
+        return FeatureExtractorV1(aggregate_embed=aggregate_embed, is_av=True)
+
+    audio_inner_dim = transformer_config["audio_num_attention_heads"] * transformer_config["audio_attention_head_dim"]
+    return FeatureExtractorV2(
+        embedding_dim=embedding_dim,
+        audio_aggregate_embed=torch.nn.Linear(flat_dim, audio_inner_dim, bias=True),
+    )
+
+
+AUDIO_ONLY_EMBEDDINGS_PROCESSOR_KEY_OPS = (
+    SDOps("AUDIO_ONLY_EMBEDDINGS_PROCESSOR_KEY_OPS")
+    # V1 shared aggregate embed (also used for audio in V1 models)
+    .with_matching(prefix="text_embedding_projection.aggregate_embed.")
+    .with_replacement("text_embedding_projection.aggregate_embed.", "feature_extractor.aggregate_embed.")
+    # V2 audio aggregate embed only
+    .with_matching(prefix="text_embedding_projection.audio_aggregate_embed.")
+    .with_replacement("text_embedding_projection.audio_aggregate_embed.", "feature_extractor.audio_aggregate_embed.")
+    # Audio connector only
     .with_matching(prefix="model.diffusion_model.audio_embeddings_connector.")
     .with_replacement("model.diffusion_model.audio_embeddings_connector.", "audio_connector.")
 )

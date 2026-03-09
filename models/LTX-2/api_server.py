@@ -118,6 +118,7 @@ MAX_QUEUE_SIZE = int(os.environ.get("LTX_MAX_QUEUE_SIZE", "32"))
 LTX_HF_REPO = os.environ.get("LTX_HF_REPO", "Lightricks/LTX-2.3-fp8")
 LTX_HF_CHECKPOINT = os.environ.get("LTX_HF_CHECKPOINT", "ltx-2.3-22b-dev-fp8.safetensors")
 GEMMA_HF_REPO = os.environ.get("LTX_GEMMA_HF_REPO", "google/gemma-3-12b-it-qat-q4_0-unquantized")
+GEMMA_4BIT = os.environ.get("LTX_GEMMA_4BIT", "true").lower() in ("1", "true", "yes")
 AUDIO_CHECKPOINT_NAME = "ltx-audio-only.safetensors"
 
 
@@ -325,13 +326,17 @@ def _load_pipeline() -> Any:
             loras = [LoraPathStrengthAndSDOps(path=lora_state.loaded_path, strength=lora_state.scale)]
             logger.info("LoRA: %s (scale=%.2f)", lora_state.loaded_path, lora_state.scale)
 
-        logger.info("[3/3] Building pipeline: checkpoint=%s, gemma=%s, device=%s", ckpt, gemma_root, dev)
+        logger.info(
+            "[3/3] Building pipeline: checkpoint=%s, gemma=%s, device=%s, gemma_4bit=%s",
+            ckpt, gemma_root, dev, GEMMA_4BIT,
+        )
         model_t0 = time.time()
         _pipeline = AudioOnlyPipeline(
             checkpoint_path=ckpt,
             gemma_root=gemma_root,
             loras=tuple(loras),
             device=dev,
+            gemma_4bit=GEMMA_4BIT,
         )
         model_elapsed = time.time() - model_t0
         total_elapsed = time.time() - pipeline_t0
