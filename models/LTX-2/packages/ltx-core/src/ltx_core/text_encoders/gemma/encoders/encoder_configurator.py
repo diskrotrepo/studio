@@ -159,7 +159,7 @@ def create_and_populate(module: GemmaTextEncoder) -> GemmaTextEncoder:
 
     config = model.config.text_config
     dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
-    base = config.rope_local_base_freq
+    base = getattr(config, "rope_local_base_freq", 10000)
     local_rope_freqs = 1.0 / (base ** (torch.arange(0, dim, 2, dtype=torch.int64).to(dtype=torch.float) / dim))
     inv_freqs, _ = ROPE_INIT_FUNCTIONS[config.rope_scaling["rope_type"]](config)
 
