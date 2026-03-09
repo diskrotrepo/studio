@@ -70,9 +70,9 @@ class LoggingTqdm(tqdm):
     """
 
     def __init__(self, *args, **kwargs):
+        self._last_logged_pct = -10  # must be set before super().__init__ which calls display()
         kwargs.setdefault("mininterval", 5)  # seconds between updates
         super().__init__(*args, **kwargs)
-        self._last_logged_pct = -10  # force first log
 
     def display(self, msg=None, pos=None):
         if self.total and self.total > 0:
