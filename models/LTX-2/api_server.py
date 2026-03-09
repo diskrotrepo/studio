@@ -111,8 +111,8 @@ API_KEY = os.environ.get("LTX_API_KEY", "")
 MAX_QUEUE_SIZE = int(os.environ.get("LTX_MAX_QUEUE_SIZE", "32"))
 
 # HuggingFace model repos for auto-download
-LTX_HF_REPO = os.environ.get("LTX_HF_REPO", "Lightricks/LTX-2.3")
-LTX_HF_CHECKPOINT = os.environ.get("LTX_HF_CHECKPOINT", "ltx-2.3-22b-distilled.safetensors")
+LTX_HF_REPO = os.environ.get("LTX_HF_REPO", "Lightricks/LTX-2.3-fp8")
+LTX_HF_CHECKPOINT = os.environ.get("LTX_HF_CHECKPOINT", "ltx-2.3-22b-dev-fp8.safetensors")
 GEMMA_HF_REPO = os.environ.get("LTX_GEMMA_HF_REPO", "google/gemma-3-12b-it-qat-q4_0-unquantized")
 AUDIO_CHECKPOINT_NAME = "ltx-audio-only.safetensors"
 
