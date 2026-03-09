@@ -362,6 +362,10 @@ def _run_generation(job_id: str, params: dict[str, Any]) -> None:
         frame_rate = float(params.get("frame_rate", 24.0))
         enhance_prompt = bool(params.get("enhance_prompt", False))
         batch_size = int(params.get("batch_size", 1))
+        negative_prompt = params.get("negative_prompt", "")
+        audio_cfg_guidance_scale = float(params.get("audio_cfg_guidance_scale", 7.0))
+        audio_stg_guidance_scale = float(params.get("audio_stg_guidance_scale", 1.0))
+        audio_rescale_scale = float(params.get("audio_rescale_scale", 0.7))
 
         results = []
         for i in range(batch_size):
@@ -372,6 +376,10 @@ def _run_generation(job_id: str, params: dict[str, Any]) -> None:
                 num_frames=num_frames,
                 frame_rate=frame_rate,
                 enhance_prompt=enhance_prompt,
+                negative_prompt=negative_prompt,
+                audio_cfg_guidance_scale=audio_cfg_guidance_scale,
+                audio_stg_guidance_scale=audio_stg_guidance_scale,
+                audio_rescale_scale=audio_rescale_scale,
             )
 
             out_dir = Path(OUTPUT_DIR)

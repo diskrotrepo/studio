@@ -24,3 +24,6 @@ services:
 
   midi:
     image: diskrot/diskrot-studio:midi-dev
+
+  ltx:
+    image: diskrot/diskrot-studio:ltx-${LTX_VARIANT:-cpu}-dev

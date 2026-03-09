@@ -686,6 +686,75 @@ def simple_audio_only_denoising_func(
     return audio_only_denoising_step
 
 
+def guided_audio_only_denoising_func(
+    audio_guider_factory: MultiModalGuiderFactory,
+    audio_context: torch.Tensor,
+    transformer: X0Model,
+) -> DenoisingFunc:
+    """Create a guided denoising function for audio-only generation.
+
+    Like :func:`simple_audio_only_denoising_func` but applies CFG, STG, and
+    rescale guidance via a :class:`MultiModalGuiderFactory`.  Passes
+    ``video=None`` to the transformer (required for AudioOnly model type).
+    """
+    sigma_vals_cached: list[float] | None = None
+    last_denoised_audio: torch.Tensor | None = None
+
+    def guided_audio_only_step(
+        video_state: LatentState, audio_state: LatentState, sigmas: torch.Tensor, step_index: int
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        nonlocal sigma_vals_cached, last_denoised_audio
+        if sigma_vals_cached is None:
+            sigma_vals_cached = sigmas.detach().cpu().tolist()
+
+        audio_guider = audio_guider_factory.build_from_sigma(sigma_vals_cached[step_index])
+
+        if audio_guider.should_skip_step(step_index):
+            return video_state.clean_latent, last_denoised_audio
+
+        sigma = sigmas[step_index]
+        pos_audio = modality_from_latent_state(audio_state, audio_context, sigma)
+
+        # Positive (conditional) forward
+        _, denoised_audio = transformer(video=None, audio=pos_audio, perturbations=None)
+
+        # CFG: negative / unconditional forward
+        neg_denoised_audio = 0.0
+        if audio_guider.do_unconditional_generation():
+            neg_context = (
+                audio_guider.negative_context
+                if audio_guider.negative_context is not None
+                else audio_context
+            )
+            neg_audio = modality_from_latent_state(audio_state, neg_context, sigma)
+            _, neg_denoised_audio = transformer(video=None, audio=neg_audio, perturbations=None)
+
+        # STG: perturbed forward
+        ptb_denoised_audio = 0.0
+        if audio_guider.do_perturbed_generation():
+            perturbation_config = PerturbationConfig(
+                perturbations=[
+                    Perturbation(
+                        type=PerturbationType.SKIP_AUDIO_SELF_ATTN,
+                        blocks=audio_guider.params.stg_blocks,
+                    )
+                ]
+            )
+            _, ptb_denoised_audio = transformer(
+                video=None,
+                audio=pos_audio,
+                perturbations=BatchedPerturbationConfig(perturbations=[perturbation_config]),
+            )
+
+        # No isolated-modality guidance in audio-only mode (no cross-modal)
+        denoised_audio = audio_guider.calculate(denoised_audio, neg_denoised_audio, ptb_denoised_audio, 0.0)
+
+        last_denoised_audio = denoised_audio
+        return video_state.clean_latent, denoised_audio
+
+    return guided_audio_only_step
+
+
 _UNICODE_REPLACEMENTS = str.maketrans("\u2018\u2019\u201c\u201d\u2014\u2013\u00a0\u2032\u2212", "''\"\"-- '-")
 
 

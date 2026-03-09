@@ -146,7 +146,6 @@ final _fallbackCapabilities = <String, ModelCapabilities>{
       'prompt',
       'negative_prompt',
       'guidance_scale',
-      'inference_steps',
       'audio_duration',
       'batch_size',
     ],

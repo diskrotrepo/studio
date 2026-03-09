@@ -1,5 +1,5 @@
 @echo off
-:: studio///diskrot — Start the stack using nightly (dev-channel) images
+:: studio///diskrot -- Start the stack using nightly (dev-channel) images
 ::
 :: Pulls and runs images built from the main branch instead of stable.
 :: Useful for testing the latest changes before they land in a release.
@@ -94,7 +94,7 @@ popd
 exit /b 0
 
 :show_help
-echo studio///diskrot — Start the stack using nightly (dev-channel) images
+echo studio///diskrot -- Start the stack using nightly (dev-channel) images
 echo.
 echo Pulls and runs images built from the main branch instead of stable.
 echo Useful for testing the latest changes before they land in a release.

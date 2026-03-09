@@ -316,6 +316,8 @@ do_install() {
     mkdir -p "$project_dir/data/acestep-output"
     mkdir -p "$project_dir/data/yulan-hf-cache"
     mkdir -p "$project_dir/data/yulan-gguf"
+    mkdir -p "$project_dir/data/ltx-checkpoints"
+    mkdir -p "$project_dir/data/ltx-output"
     print_ok "Data directories ready."
 
     # -- Step 5: Environment Configuration -------------------------------------
@@ -373,6 +375,7 @@ BUILD_ENV=local
 # Mac always uses CPU mode (no NVIDIA GPU)
 ACESTEP_VARIANT=cpu
 YULAN_VARIANT=cpu
+LTX_VARIANT=cpu
 COMPOSE_FILE=docker-compose.yml
 # Hugging Face token for model downloads (get one at https://huggingface.co/settings/tokens)
 HF_TOKEN=${hf_token}

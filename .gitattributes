@@ -2,4 +2,7 @@
 *.sh text eol=lf
 Dockerfile text eol=lf
 entrypoint.sh text eol=lf
+
+# Force CRLF for Windows batch files
+*.bat text eol=crlf
 *.npz filter=lfs diff=lfs merge=lfs -text

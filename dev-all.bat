@@ -1,5 +1,5 @@
 @echo off
-:: studio///diskrot — Build ALL images from source (Windows)
+:: studio///diskrot -- Build ALL images from source (Windows)
 ::
 :: Builds every custom Docker image from local source and starts the stack.
 :: For backend + UI only, use dev.bat instead.
@@ -106,7 +106,7 @@ popd
 exit /b 0
 
 :show_help
-echo studio///diskrot — Build ALL images from source (Windows)
+echo studio///diskrot -- Build ALL images from source (Windows)
 echo For backend + UI only, use dev.bat instead.
 echo.
 echo Usage:

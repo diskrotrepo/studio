@@ -25,7 +25,6 @@ class LtxClient extends AudioModelClient {
       'prompt',
       'negative_prompt',
       'guidance_scale',
-      'inference_steps',
       'audio_duration',
       'batch_size',
       'num_frames',
@@ -45,7 +44,6 @@ class LtxClient extends AudioModelClient {
 
   @override
   Map<String, dynamic> get defaults => {
-    'inference_steps': 40,
     'num_frames': 121,
     'frame_rate': 24.0,
     'audio_cfg_guidance_scale': 7.0,
@@ -161,8 +159,6 @@ class LtxClient extends AudioModelClient {
 
   static const _fieldNameMap = {
     'guidance_scale': 'audio_cfg_guidance_scale',
-    'inference_steps': 'num_inference_steps',
-    'audio_duration': 'num_frames',
     'negative_prompt': 'negative_prompt',
   };
 
@@ -170,10 +166,17 @@ class LtxClient extends AudioModelClient {
     String taskType,
     Map<String, dynamic> payload,
   ) {
+    final frameRate = (payload['frame_rate'] as num?)?.toDouble() ??
+        (defaults['frame_rate'] as num).toDouble();
+
     return {
       'task_type': _taskTypeMap[taskType] ?? taskType,
       for (final entry in payload.entries)
-        (_fieldNameMap[entry.key] ?? entry.key): entry.value,
+        if (entry.key == 'audio_duration')
+          'num_frames':
+              ((entry.value as num).toDouble() * frameRate).round()
+        else
+          (_fieldNameMap[entry.key] ?? entry.key): entry.value,
     };
   }
 }
