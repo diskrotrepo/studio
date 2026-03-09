@@ -42,7 +42,8 @@ def get_device() -> torch.device:
 def cleanup_memory() -> None:
     gc.collect()
     torch.cuda.empty_cache()
-    torch.cuda.synchronize()
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
 
 
 def encode_prompts(
@@ -73,16 +74,11 @@ def encode_prompts(
         prompts = list(prompts)
         prompts[0] = generate_enhanced_prompt(text_encoder, prompts[0], enhance_prompt_image, seed=enhance_prompt_seed)
     raw_outputs = [text_encoder.encode(p) for p in prompts]
-    torch.cuda.synchronize()
-    del text_encoder
-    cleanup_memory()
 
     embeddings_processor = model_ledger.gemma_embeddings_processor()
     results: list[EmbeddingsProcessorOutput] = [
         embeddings_processor.process_hidden_states(hs, mask) for hs, mask in raw_outputs
     ]
-    del embeddings_processor
-    cleanup_memory()
     return results
 
 

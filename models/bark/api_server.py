@@ -164,4 +164,13 @@ async def get_output(filename: str):
 
 if __name__ == "__main__":
     port = int(os.environ.get("BARK_PORT", "8002"))
-    uvicorn.run("api_server:app", host="0.0.0.0", port=port)
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["access"]["fmt"] = (
+        "%(asctime)s %(levelprefix)s %(client_addr)s - \"%(request_line)s\" %(status_code)s"
+    )
+    log_config["formatters"]["access"]["datefmt"] = "%Y-%m-%d %H:%M:%S"
+    log_config["formatters"]["default"]["fmt"] = (
+        "%(asctime)s %(levelprefix)s %(message)s"
+    )
+    log_config["formatters"]["default"]["datefmt"] = "%Y-%m-%d %H:%M:%S"
+    uvicorn.run("api_server:app", host="0.0.0.0", port=port, log_config=log_config)

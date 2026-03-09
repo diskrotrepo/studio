@@ -78,8 +78,28 @@ class SingleGPUModelBuilder(Generic[ModelType], ModelBuilderProtocol[ModelType],
         uninitialized_params = [name for name, param in meta_model.named_parameters() if str(param.device) == "meta"]
         uninitialized_buffers = [name for name, buffer in meta_model.named_buffers() if str(buffer.device) == "meta"]
         if uninitialized_params or uninitialized_buffers:
-            logger.warning(f"Uninitialized parameters or buffers: {uninitialized_params + uninitialized_buffers}")
-            return meta_model
+            logger.warning(
+                "Uninitialized parameters (%d) or buffers (%d) — these will be ZEROED OUT:\n  params: %s\n  buffers: %s",
+                len(uninitialized_params),
+                len(uninitialized_buffers),
+                uninitialized_params[:20],
+                uninitialized_buffers[:20],
+            )
+            # Materialize remaining meta tensors so .to(device) succeeds
+            for name, param in meta_model.named_parameters():
+                if str(param.device) == "meta":
+                    materialized = torch.zeros(param.shape, dtype=param.dtype, device="cpu")
+                    parts = name.rsplit(".", 1)
+                    parent = meta_model if len(parts) == 1 else meta_model.get_submodule(parts[0])
+                    attr = parts[-1]
+                    setattr(parent, attr, torch.nn.Parameter(materialized, requires_grad=param.requires_grad))
+            for name, buf in meta_model.named_buffers():
+                if str(buf.device) == "meta":
+                    materialized = torch.zeros(buf.shape, dtype=buf.dtype, device="cpu")
+                    parts = name.rsplit(".", 1)
+                    parent = meta_model if len(parts) == 1 else meta_model.get_submodule(parts[0])
+                    attr = parts[-1]
+                    parent.register_buffer(attr, materialized)
         retval = meta_model.to(device)
         return retval
 
@@ -95,7 +115,11 @@ class SingleGPUModelBuilder(Generic[ModelType], ModelBuilderProtocol[ModelType],
             sd = model_state_dict.sd
             if dtype is not None:
                 sd = {key: value.to(dtype=dtype) for key, value in model_state_dict.sd.items()}
-            meta_model.load_state_dict(sd, strict=False, assign=True)
+            result = meta_model.load_state_dict(sd, strict=False, assign=True)
+            if result.missing_keys:
+                logger.warning("load_state_dict missing keys (%d): %s", len(result.missing_keys), result.missing_keys[:20])
+            if result.unexpected_keys:
+                logger.info("load_state_dict unexpected keys (%d): %s", len(result.unexpected_keys), result.unexpected_keys[:20])
             return self._return_model(meta_model, device)
 
         lora_state_dicts = [

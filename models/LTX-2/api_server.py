@@ -46,7 +46,11 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from tqdm import tqdm
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 
 
@@ -650,7 +654,16 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=API_PORT)
     args = parser.parse_args()
 
-    uvicorn.run(app, host=args.host, port=args.port, workers=1)
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["access"]["fmt"] = (
+        "%(asctime)s %(levelprefix)s %(client_addr)s - \"%(request_line)s\" %(status_code)s"
+    )
+    log_config["formatters"]["access"]["datefmt"] = "%Y-%m-%d %H:%M:%S"
+    log_config["formatters"]["default"]["fmt"] = (
+        "%(asctime)s %(levelprefix)s %(message)s"
+    )
+    log_config["formatters"]["default"]["datefmt"] = "%Y-%m-%d %H:%M:%S"
+    uvicorn.run(app, host=args.host, port=args.port, workers=1, log_config=log_config)
 
 
 if __name__ == "__main__":

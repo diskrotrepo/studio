@@ -155,10 +155,6 @@ class AudioOnlyPipeline:
             device=self.device,
         )
 
-        torch.cuda.synchronize()
-        del transformer
-        cleanup_memory()
-
         decoded_audio = vae_decode_audio(
             audio_state.latent, self.model_ledger.audio_decoder(), self.model_ledger.vocoder()
         )
