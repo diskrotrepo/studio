@@ -35,14 +35,65 @@ from threading import Lock
 from typing import Any, Optional
 from uuid import uuid4
 
+import shutil
+
 import torch
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Download progress helpers
+# ---------------------------------------------------------------------------
+def _fmt_size(num_bytes: float) -> str:
+    """Human-readable file size."""
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if abs(num_bytes) < 1024:
+            return f"{num_bytes:.1f} {unit}"
+        num_bytes /= 1024
+    return f"{num_bytes:.1f} PB"
+
+
+class LoggingTqdm(tqdm):
+    """A tqdm subclass that periodically logs progress instead of drawing a bar.
+
+    Logs at ~10 % intervals so server logs stay readable while still showing
+    download progress for large files.
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("mininterval", 5)  # seconds between updates
+        super().__init__(*args, **kwargs)
+        self._last_logged_pct = -10  # force first log
+
+    def display(self, msg=None, pos=None):
+        if self.total and self.total > 0:
+            pct = self.n / self.total * 100
+            if pct - self._last_logged_pct >= 10 or pct >= 100:
+                self._last_logged_pct = pct
+                desc = self.desc or "Downloading"
+                elapsed = self.format_interval(self.elapsed) if self.elapsed else "?"
+                speed = _fmt_size(self.n / self.elapsed) + "/s" if self.elapsed and self.elapsed > 0 else "?"
+                logger.info(
+                    "%s: %s / %s (%.0f%%) — elapsed %s, speed %s",
+                    desc, _fmt_size(self.n), _fmt_size(self.total), pct, elapsed, speed,
+                )
+        elif self.n > 0:
+            desc = self.desc or "Downloading"
+            logger.info("%s: %s downloaded", desc, _fmt_size(self.n))
+
+    def close(self):
+        if self.total and self.n >= self.total:
+            desc = self.desc or "Download"
+            elapsed = self.format_interval(self.elapsed) if self.elapsed else "?"
+            logger.info("%s: complete — %s in %s", desc, _fmt_size(self.total), elapsed)
+        super().close()
 
 # ---------------------------------------------------------------------------
 # Configuration from environment
@@ -134,19 +185,29 @@ def _ensure_gemma_downloaded() -> str:
     gemma_path = Path(GEMMA_ROOT)
     # Check if it already has model files
     if gemma_path.is_dir() and any(gemma_path.rglob("*.safetensors")):
-        logger.info("Gemma text encoder found at %s", gemma_path)
+        total_size = sum(f.stat().st_size for f in gemma_path.rglob("*") if f.is_file())
+        logger.info("Gemma text encoder found at %s (%s on disk)", gemma_path, _fmt_size(total_size))
         return str(gemma_path)
 
-    logger.info("Gemma text encoder not found at %s, downloading from %s ...", gemma_path, GEMMA_HF_REPO)
+    logger.info("=" * 60)
+    logger.info("DOWNLOADING Gemma text encoder")
+    logger.info("  Repo : %s", GEMMA_HF_REPO)
+    logger.info("  Dest : %s", gemma_path)
+    logger.info("  This is a large download and may take a while ...")
+    logger.info("=" * 60)
     from huggingface_hub import snapshot_download
 
     gemma_path.mkdir(parents=True, exist_ok=True)
+    t0 = time.time()
     snapshot_download(
         repo_id=GEMMA_HF_REPO,
         local_dir=str(gemma_path),
         local_dir_use_symlinks=False,
+        tqdm_class=LoggingTqdm,
     )
-    logger.info("Gemma text encoder downloaded to %s", gemma_path)
+    elapsed = time.time() - t0
+    total_size = sum(f.stat().st_size for f in gemma_path.rglob("*") if f.is_file())
+    logger.info("Gemma text encoder downloaded to %s (%s in %.1fs)", gemma_path, _fmt_size(total_size), elapsed)
     return str(gemma_path)
 
 
@@ -164,7 +225,8 @@ def _ensure_checkpoint_ready() -> str:
     # 1. Look for existing audio-only checkpoint
     audio_ckpt = ckpt_dir / AUDIO_CHECKPOINT_NAME
     if audio_ckpt.is_file():
-        logger.info("Audio-only checkpoint found: %s", audio_ckpt)
+        size = audio_ckpt.stat().st_size
+        logger.info("Audio-only checkpoint found: %s (%s)", audio_ckpt, _fmt_size(size))
         return str(audio_ckpt)
 
     # 2. Look for any existing .safetensors file
@@ -174,24 +236,37 @@ def _ensure_checkpoint_ready() -> str:
 
     if non_gemma:
         full_ckpt = non_gemma[0]
-        logger.info("Found checkpoint: %s — extracting audio-only weights ...", full_ckpt)
+        size = full_ckpt.stat().st_size
+        logger.info("Found checkpoint: %s (%s) — will extract audio-only weights ...", full_ckpt, _fmt_size(size))
         _extract_audio(str(full_ckpt), str(audio_ckpt))
         return str(audio_ckpt)
 
     # 3. No checkpoint at all — download from HuggingFace
-    logger.info("No checkpoint found under %s, downloading %s from %s ...", ckpt_dir, LTX_HF_CHECKPOINT, LTX_HF_REPO)
+    disk = shutil.disk_usage(str(ckpt_dir))
+    logger.info("=" * 60)
+    logger.info("DOWNLOADING LTX checkpoint")
+    logger.info("  Repo : %s", LTX_HF_REPO)
+    logger.info("  File : %s", LTX_HF_CHECKPOINT)
+    logger.info("  Dest : %s", ckpt_dir)
+    logger.info("  Free disk space: %s", _fmt_size(disk.free))
+    logger.info("  This is a large download and may take a while ...")
+    logger.info("=" * 60)
     from huggingface_hub import hf_hub_download
 
+    t0 = time.time()
     downloaded = hf_hub_download(
         repo_id=LTX_HF_REPO,
         filename=LTX_HF_CHECKPOINT,
         local_dir=str(ckpt_dir),
         local_dir_use_symlinks=False,
+        tqdm_class=LoggingTqdm,
     )
-    logger.info("Downloaded checkpoint to %s", downloaded)
+    elapsed = time.time() - t0
+    dl_size = Path(downloaded).stat().st_size
+    logger.info("Downloaded checkpoint to %s (%s in %.1fs)", downloaded, _fmt_size(dl_size), elapsed)
 
     # Extract audio-only weights
-    logger.info("Extracting audio-only weights ...")
+    logger.info("Extracting audio-only weights from %s ...", Path(downloaded).name)
     _extract_audio(downloaded, str(audio_ckpt))
     return str(audio_ckpt)
 
@@ -200,8 +275,13 @@ def _extract_audio(input_path: str, output_path: str) -> None:
     """Extract audio-only weights from a full AV checkpoint."""
     from ltx_pipelines.extract_audio_checkpoint import extract_audio_checkpoint
 
+    in_size = Path(input_path).stat().st_size
+    logger.info("Extracting audio-only weights: %s (%s) -> %s", Path(input_path).name, _fmt_size(in_size), output_path)
+    t0 = time.time()
     extract_audio_checkpoint(input_path, output_path)
-    logger.info("Audio-only checkpoint saved to %s", output_path)
+    elapsed = time.time() - t0
+    out_size = Path(output_path).stat().st_size
+    logger.info("Audio-only checkpoint saved to %s (%s, took %.1fs)", output_path, _fmt_size(out_size), elapsed)
 
 
 def _load_pipeline() -> Any:
@@ -213,23 +293,45 @@ def _load_pipeline() -> Any:
         from ltx_core.loader import LoraPathStrengthAndSDOps
         from ltx_pipelines.audio_only import AudioOnlyPipeline
 
+        pipeline_t0 = time.time()
+        logger.info("=" * 60)
+        logger.info("INITIALIZING LTX-2 PIPELINE")
+        logger.info("=" * 60)
+
         # Auto-download and prepare checkpoint + gemma
+        logger.info("[1/3] Preparing LTX checkpoint ...")
         ckpt = _ensure_checkpoint_ready()
+
+        logger.info("[2/3] Preparing Gemma text encoder ...")
         gemma_root = _ensure_gemma_downloaded()
+
         dev = torch.device(DEVICE if DEVICE != "cpu" and torch.cuda.is_available() else "cpu")
+        if dev.type == "cuda" and torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            free_mem, total_mem = torch.cuda.mem_get_info(0)
+            logger.info("GPU: %s (%s VRAM, %s free)", gpu_name, _fmt_size(total_mem), _fmt_size(free_mem))
+        else:
+            logger.info("Device: CPU (no CUDA GPU detected)")
 
         loras: list[LoraPathStrengthAndSDOps] = []
         if lora_state.loaded_path and lora_state.active:
             loras = [LoraPathStrengthAndSDOps(path=lora_state.loaded_path, strength=lora_state.scale)]
+            logger.info("LoRA: %s (scale=%.2f)", lora_state.loaded_path, lora_state.scale)
 
-        logger.info("Loading LTX-2 pipeline: checkpoint=%s, gemma=%s, device=%s", ckpt, gemma_root, dev)
+        logger.info("[3/3] Building pipeline: checkpoint=%s, gemma=%s, device=%s", ckpt, gemma_root, dev)
+        model_t0 = time.time()
         _pipeline = AudioOnlyPipeline(
             checkpoint_path=ckpt,
             gemma_root=gemma_root,
             loras=tuple(loras),
             device=dev,
         )
-        logger.info("LTX-2 pipeline loaded successfully")
+        model_elapsed = time.time() - model_t0
+        total_elapsed = time.time() - pipeline_t0
+        logger.info("Pipeline model loading took %.1fs", model_elapsed)
+        logger.info("=" * 60)
+        logger.info("LTX-2 PIPELINE READY (total init: %.1fs)", total_elapsed)
+        logger.info("=" * 60)
         return _pipeline
 
 
