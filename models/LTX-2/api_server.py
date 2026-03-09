@@ -223,6 +223,7 @@ def _ensure_checkpoint_ready() -> str:
     """
     ckpt_dir = Path(CHECKPOINT_PATH)
     ckpt_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("Checking for checkpoints in %s ...", ckpt_dir)
 
     # 1. Look for existing audio-only checkpoint
     audio_ckpt = ckpt_dir / AUDIO_CHECKPOINT_NAME
@@ -351,8 +352,11 @@ def _reload_pipeline() -> Any:
 @torch.inference_mode()
 def _run_generation(job_id: str, params: dict[str, Any]) -> None:
     try:
+        logger.info("[%s] Starting generation ...", job_id)
         store.update(job_id, progress_text="loading model")
+        t0 = time.time()
         pipeline = _load_pipeline()
+        logger.info("[%s] Pipeline ready (%.1fs)", job_id, time.time() - t0)
 
         store.update(job_id, progress_text="generating")
 
@@ -367,9 +371,18 @@ def _run_generation(job_id: str, params: dict[str, Any]) -> None:
         audio_stg_guidance_scale = float(params.get("audio_stg_guidance_scale", 1.0))
         audio_rescale_scale = float(params.get("audio_rescale_scale", 0.7))
 
+        logger.info(
+            "[%s] Params: prompt=%r, seed=%d, frames=%d, fps=%.1f, batch=%d, "
+            "cfg=%.1f, stg=%.1f, rescale=%.1f",
+            job_id, prompt[:80], seed, num_frames, frame_rate, batch_size,
+            audio_cfg_guidance_scale, audio_stg_guidance_scale, audio_rescale_scale,
+        )
+
         results = []
+        gen_t0 = time.time()
         for i in range(batch_size):
             current_seed = seed + i
+            logger.info("[%s] Generating batch item %d/%d (seed=%d) ...", job_id, i + 1, batch_size, current_seed)
             audio = pipeline(
                 prompt=prompt,
                 seed=current_seed,
@@ -391,7 +404,10 @@ def _run_generation(job_id: str, params: dict[str, Any]) -> None:
             encode_audio_wav(audio, str(out_path))
 
             results.append({"file": f"/output/{filename}", "status": 1})
+            logger.info("[%s] Saved %s", job_id, out_path)
 
+        gen_elapsed = time.time() - gen_t0
+        logger.info("[%s] Generation complete (%d items in %.1fs)", job_id, len(results), gen_elapsed)
         store.update(
             job_id,
             status=JobStatus.SUCCEEDED,
@@ -401,7 +417,7 @@ def _run_generation(job_id: str, params: dict[str, Any]) -> None:
 
     except Exception:
         tb = traceback.format_exc()
-        logger.error("Generation failed for %s: %s", job_id, tb)
+        logger.error("[%s] Generation FAILED:\n%s", job_id, tb)
         store.update(
             job_id,
             status=JobStatus.FAILED,
@@ -452,6 +468,7 @@ async def _queue_worker(app: FastAPI) -> None:
     loop = asyncio.get_event_loop()
     while True:
         job_id, params = await app.state.job_queue.get()
+        logger.info("Worker dequeued job %s (prompt=%r)", job_id, (params.get("prompt", "")[:80]))
         async with app.state.pending_lock:
             if job_id in app.state.pending_ids:
                 app.state.pending_ids.remove(job_id)
