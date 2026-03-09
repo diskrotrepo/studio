@@ -1,5 +1,7 @@
 """FastAPI server for LTX-2 audio-only generation.
 
+by diskrot
+
 Endpoints:
 - POST /release_task          Create audio generation task
 - POST /query_result          Batch query task results
