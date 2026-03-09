@@ -117,6 +117,12 @@ abstract class S {
   /// **'Training'**
   String get navTraining;
 
+  /// No description provided for @navSequencer.
+  ///
+  /// In en, this message translates to:
+  /// **'Sequencer'**
+  String get navSequencer;
+
   /// No description provided for @navSettings.
   ///
   /// In en, this message translates to:
@@ -800,6 +806,12 @@ abstract class S {
   /// In en, this message translates to:
   /// **'Bark'**
   String get modelBark;
+
+  /// No description provided for @modelLtx.
+  ///
+  /// In en, this message translates to:
+  /// **'LTX-2'**
+  String get modelLtx;
 
   /// No description provided for @labelTaskType.
   ///

@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:studio_backend/src/browse/browse_service.dart';
 import 'package:studio_backend/src/audio/ace_step_15/ace_step_15_client.dart';
 import 'package:studio_backend/src/audio/bark/bark_client.dart';
+import 'package:studio_backend/src/audio/ltx/ltx_client.dart';
 import 'package:studio_backend/src/audio/midi/midi_client.dart';
 import 'package:studio_backend/src/audio/audio_client.dart';
 import 'package:studio_backend/src/audio/audio_generation_task_repository.dart';
@@ -150,6 +151,11 @@ Future<void> dependencySetup(Database database) async {
       if (audioModels.containsKey('midi'))
         'midi': MidiClient(
           baseUrl: audioModels['midi']!,
+          apiKey: audioApiKey,
+        ),
+      if (audioModels.containsKey('ltx'))
+        'ltx': LtxClient(
+          baseUrl: audioModels['ltx']!,
           apiKey: audioApiKey,
         ),
     };

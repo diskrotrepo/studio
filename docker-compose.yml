@@ -15,6 +15,8 @@ services:
       - ./data/bark-cache:/mnt/bark-cache
       - ./data/midi-output:/mnt/midi-output
       - ./data/midi-checkpoints:/mnt/midi-checkpoints
+      - ./data/ltx-checkpoints:/mnt/ltx-checkpoints
+      - ./data/ltx-output:/mnt/ltx-output
     entrypoint: /bin/sh
     command:
       - -c
@@ -27,6 +29,8 @@ services:
         chmod -R g+w    /mnt/bark-output /mnt/bark-cache
         chown -R 1001:0 /mnt/midi-output /mnt/midi-checkpoints
         chmod -R g+w    /mnt/midi-output /mnt/midi-checkpoints
+        chown -R 1001:0 /mnt/ltx-checkpoints /mnt/ltx-output
+        chmod -R g+w    /mnt/ltx-checkpoints /mnt/ltx-output
     networks:
       - studio-network
 
@@ -121,10 +125,10 @@ services:
       REDIS_HOST: redis
       DISKROT_STORAGE_ROOT: /data/storage
       DISKROT_STUDIO_BUCKET: studio
-      AUDIO_MODELS: '{"ace_step_15": "http://acestep:8001", "bark": "http://bark:8002", "midi": "http://midi:8004"}'
+      AUDIO_MODELS: '{"ace_step_15": "http://acestep:8001", "bark": "http://bark:8002", "midi": "http://midi:8004", "ltx": "http://ltx:8005"}'
       AUDIO_API_KEY: ${ACESTEP_API_KEY:-}
       TEXT_MODELS: '{"yulan_mini": "http://yulan:8003"}'
-      DISABLED_MODELS: ${DISABLED_MODELS:-midi}
+      DISABLED_MODELS: ${DISABLED_MODELS:-midi,bark}
     volumes:
       - studio-storage:/data/storage
     networks:
@@ -138,7 +142,7 @@ services:
         condition: service_healthy
       yulan:
         condition: service_healthy
-      bark:
+      ltx:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/v1/health/status"]
@@ -224,6 +228,7 @@ services:
     container_name: diskrot-bark
     image: diskrot/diskrot-studio:bark-${BARK_VARIANT:-cpu}
     restart: unless-stopped
+    profiles: ["bark"]
     ports:
       - "${BARK_PORT:-8002}:8002"
     environment:
@@ -280,6 +285,37 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  ltx:
+    container_name: diskrot-ltx
+    image: diskrot/diskrot-studio:ltx-${LTX_VARIANT:-cpu}
+    restart: unless-stopped
+    ports:
+      - "${LTX_PORT:-8005}:8005"
+    environment:
+      LTX_CHECKPOINT_PATH: /app/checkpoints
+      LTX_GEMMA_ROOT: /app/checkpoints/gemma
+      LTX_OUTPUT_DIR: /data/output
+      LTX_LORA_DIR: /app/loras
+      LTX_DEVICE: ${LTX_VARIANT:-cpu}
+      LTX_API_HOST: 0.0.0.0
+      LTX_API_PORT: "8005"
+      LTX_API_KEY: ${LTX_API_KEY:-}
+    volumes:
+      - ./data/ltx-checkpoints:/app/checkpoints
+      - ./data/ltx-output:/data/output
+      - ./models/LTX-2/loras:/app/loras
+    networks:
+      - studio-network
+    depends_on:
+      init-permissions:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
 
 volumes:
   pgdata:

@@ -21,6 +21,9 @@ class SEn extends S {
   String get navTraining => 'Training';
 
   @override
+  String get navSequencer => 'Sequencer';
+
+  @override
   String get navSettings => 'Settings';
 
   @override
@@ -374,6 +377,9 @@ class SEn extends S {
 
   @override
   String get modelBark => 'Bark';
+
+  @override
+  String get modelLtx => 'LTX-2';
 
   @override
   String get labelTaskType => 'Task Type';

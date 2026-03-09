@@ -6,6 +6,7 @@
 
   "navCreate": "Create",
   "navTraining": "Training",
+  "navSequencer": "Sequencer",
   "navSettings": "Settings",
 
   "buttonCancel": "Cancel",
@@ -143,6 +144,7 @@
   "labelModel": "Model",
   "modelAceStep": "ACE Step 1.5",
   "modelBark": "Bark",
+  "modelLtx": "LTX-2",
   "labelTaskType": "Task Type",
   "labelTitle": "Title",
   "hintSongTitle": "Song title...",

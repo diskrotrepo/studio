@@ -50,3 +50,10 @@ services:
     build:
       context: ./models/midi
       dockerfile: Dockerfile
+
+  ltx:
+    build:
+      context: ./models/LTX-2
+      dockerfile: Dockerfile
+      args:
+        VARIANT: ${LTX_VARIANT:-cpu}
